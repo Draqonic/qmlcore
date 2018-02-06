@@ -1,5 +1,7 @@
 ///the most basic QML Object, generic event emitter, properties and id links holder
 EventEmitter {
+	property bool qt: false; // temp
+
 	constructor: {
 		this.parent = parent
 		this.children = []
