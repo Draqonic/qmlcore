@@ -8,6 +8,7 @@ Item {
 	property enum verticalAlignment { AlignTop, AlignBottom, AlignVCenter };	///< text vertical alignment
 	property enum wrapMode { NoWrap, WordWrap, WrapAnywhere, Wrap };	///< multiline text wrap mode
 	property enum textFormat { Html, Text }; ///< only html or text for now
+	property enum elide { ElideNone, ElideLeft, ElideMiddle, ElideRight };
 	property int paintedWidth;		///< real width of the text without any layout applied
 	property int paintedHeight;		///< real height of this text without any layout applied
 	width: paintedWidth;	///< @private
@@ -139,5 +140,26 @@ Item {
 
 	onWrapModeChanged: {
 		this._updateWSHandling()
+	}
+	
+	onElideChanged: {
+		this.style('direction', 'ltr');
+		switch(value) {
+		case this.ElideNone:
+			this.style('text-overflow', 'string');
+			this.clip = false; // ?
+			break
+		case this.ElideLeft:
+			this.style('direction', 'rtl');
+			this.style('text-overflow', 'ellipsis');
+			this.clip = true;
+			break
+		//case this.ElideMiddle:
+		//	break
+		case this.ElideRight:
+			this.style('text-overflow', 'ellipsis');
+			this.clip = true;
+			break
+		}
 	}
 }
