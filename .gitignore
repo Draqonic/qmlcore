@@ -2,7 +2,11 @@
 *.swo
 *.pyc
 *.pyo
+*.bat
 app/qml.js
 app/qml.min.js
 .cache/*
 node_modules
+src
+build.*
+.manifest
