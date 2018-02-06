@@ -7,6 +7,7 @@ Object {
 	property int height;					///< height of visible area
 	property bool clip;						///< clip all children outside rectangular area defined by x, y, width, height
 	property real radius;					///< round corner radius
+	property real scale: 1;
 
 	property bool focus;					///< this item can be focused
 	property bool focused; ///< this item is focused among its siblings
@@ -17,6 +18,7 @@ Object {
 	property bool visibleInView: true;		///< this item is visible inside view content area
 	property bool recursiveVisible: false;	///< this item is actually visible on screen (all parents are visible as well)
 	property real opacity: 1;				///< opacity of the item
+	property real rotation;
 
 	property lazy anchors: Anchors { }
 	property lazy effects: Effects { }
@@ -181,8 +183,10 @@ Object {
 	}
 
 	onOpacityChanged:	{ if (this.element) this.style('opacity', value); }
+	onRotationChanged:	{ this.transform.rotateZ = this.rotation }
 	onZChanged:			{ this.style('z-index', value) }
 	onRadiusChanged:	{ this.style('border-radius', value) }
+	onScaleChanged: { this.transform.scaleX = this.scale; this.transform.scaleY = this.scale; }
 	onClipChanged:		{ this.style('overflow', value? 'hidden': 'visible') }
 
 	///@private sets current global focus to component
