@@ -6,7 +6,7 @@ Object {
 	property int width;						///< width of visible area
 	property int height;					///< height of visible area
 	property bool clip;						///< clip all children outside rectangular area defined by x, y, width, height
-	property real radius;					///< round corner radius
+	property var radius;					///< round corner radius, also with support for values like "15px 50px 30px 5px"
 	property real scale: 1;
 
 	property bool focus;					///< this item can be focused
