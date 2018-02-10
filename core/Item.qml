@@ -8,6 +8,7 @@ Object {
 	property bool clip;						///< clip all children outside rectangular area defined by x, y, width, height
 	property var radius;					///< round corner radius, also with support for values like "15px 50px 30px 5px"
 	property real scale: 1;
+	property bool fixed;
 
 	property bool focus;					///< this item can be focused
 	property bool focused; ///< this item is focused among its siblings
@@ -188,6 +189,7 @@ Object {
 	onRadiusChanged:	{ this.style('border-radius', value) }
 	onScaleChanged: { this.transform.scaleX = this.scale; this.transform.scaleY = this.scale; }
 	onClipChanged:		{ this.style('overflow', value? 'hidden': 'visible') }
+	onFixedChanged:		{ this.style('position', value ? 'fixed' :  'absolute') }
 
 	///@private sets current global focus to component
 	function forceActiveFocus() {
