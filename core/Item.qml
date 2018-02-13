@@ -302,10 +302,11 @@ Object {
 
 	///@private
 	function _processKey(event) {
-		var key = _globals.core.keyCodes[event.which || event.keyCode];
+		var keyCode = event.which || event.keyCode
+		var key = _globals.core.keyCodes[keyCode]
 		var eventTime = event.timeStamp
 
-		if (key) {
+		if (key !== undefined) {
 			if (this.keyProcessDelay) {
 				if (eventTime !== this._lastEvent && eventTime - this.keyProcessDelay < this._lastEvent)
 					return true
@@ -331,7 +332,7 @@ Object {
 			if (proto_callback)
 				return this.invokeKeyHandlers(key, event, proto_callback, invoker)
 		} else {
-			log("unknown key", event.which)
+			log("unknown keycode " + keyCode + ": [" + event.charCode + " " + event.keyCode + " " + event.which + " " + event.key + " " + event.code + " " + event.location + "]")
 		}
 		return false
 	}
