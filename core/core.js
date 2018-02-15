@@ -62,7 +62,7 @@ var colorTable = {
 	'brown':				'a52a2a',
 	'burlywood':			'deb887',
 	'cadetblue':			'5f9ea0',
-	'cadetblue':			'5f9ea0',
+	'chartreuse':			'7fff00',
 	'chocolate':			'd2691e',
 	'coral':				'ff7f50',
 	'cornflowerblue':		'6495ed',

@@ -14,6 +14,7 @@ Object {
 	property bool focused; ///< this item is focused among its siblings
 	property bool activeFocus;				///< this item can receive events and really focused at this moment
 	property Item focusedChild;				///< current focused item (this item only)
+	property string class;
 
 	property bool visible: true;			///< this item and its children are visible
 	property bool visibleInView: true;		///< this item is visible inside view content area
@@ -190,6 +191,7 @@ Object {
 	onScaleChanged: { this.transform.scaleX = this.scale; this.transform.scaleY = this.scale; }
 	onClipChanged:		{ this.style('overflow', value? 'hidden': 'visible') }
 	onFixedChanged:		{ this.style('position', value ? 'fixed' :  'absolute') }
+	onClassChanged: { this.element.dom.setAttribute('class', value) }
 
 	///@private sets current global focus to component
 	function forceActiveFocus() {
