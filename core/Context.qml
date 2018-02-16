@@ -28,6 +28,81 @@ Item {
 		this.backend = _globals._backend()
 
 		this._init()
+
+		document.documentElement.style.overflowY = 'auto'
+		document.documentElement.style.overflowX = 'hidden'
+
+		window.addEventListener('scroll', function() {
+			this._updateContentScroll()
+		}.bind(this))
+	}
+
+	property enum horizontalScrollBarPolicy	{ ScrollBarAsNeeded, ScrollBarAlwaysOff, ScrollBarAlwaysOn }: ScrollBarAlwaysOff;
+	property enum verticalScrollBarPolicy	{ ScrollBarAsNeeded, ScrollBarAlwaysOff, ScrollBarAlwaysOn };
+
+    property bool atXBeginning: !contentX;
+    property bool atXEnd: contentX >= contentMaxX;
+    property bool atYBeginning: !contentY;
+    property bool atYEnd: contentY >= contentMaxY;
+	property int contentX;
+	property int contentY;
+    property int contentHeight;
+	property int contentWidth;
+	property int contentMaxX: contentWidth - width;
+	property int contentMaxY: contentHeight - height;
+    signal scrolling;
+
+    function _updateContentScroll() {
+			this.contentX = window.pageXOffset
+			this.contentY = window.pageYOffset
+			this.contentHeight = document.documentElement.scrollHeight
+			this.contentWidth = document.documentElement.scrollWidth
+            this.scrolling()
+    }
+
+	function scroll(x, y) {
+		window.scroll({
+			left: x,
+	      	top: y,
+	    	behavior: 'smooth' 
+		})
+	}
+    onCompleted: { hackScrollTimerToDelete.start() }
+
+    Timer {
+        id: hackScrollTimerToDelete;
+        interval: 100;
+        onTriggered: {
+			this.parent._updateContentScroll()
+        }
+    }
+
+	onHorizontalScrollBarPolicyChanged: {
+		switch(value) {
+			case MainItem.ScrollBarAsNeeded:
+				document.documentElement.style.overflowX = 'auto'
+				break
+			case MainItem.ScrollBarAlwaysOn:
+				document.documentElement.style.overflowX = 'visible'
+				break
+			case MainItem.ScrollBarAlwaysOff:
+				document.documentElement.style.overflowX = 'hidden'
+				break
+		}
+	}
+
+	onVerticalScrollBarPolicyChanged: {
+		switch(value) {
+			case MainItem.ScrollBarAsNeeded:
+				document.documentElement.style.overflowY = 'auto'
+				break
+			case MainItem.ScrollBarAlwaysOn:
+				document.documentElement.style.overflowY = 'visible'
+				break
+			case MainItem.ScrollBarAlwaysOff:
+				document.documentElement.style.overflowY = 'hidden'
+				break
+		}
 	}
 
 	///@private

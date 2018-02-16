@@ -43,6 +43,11 @@ Object {
 
 	property int keyProcessDelay;			///< delay time between key pressed events
 
+	property int absoluteX: -1;
+	property int absoluteY: -1;
+	property bool visibleX: absoluteX !== -1 && context.contentMaxX && (absoluteX < context.contentX + context.width) && (absoluteX + context.width > context.contentX);
+	property bool visibleY: absoluteY !== -1 && context.contentMaxY && (absoluteY < context.contentY + context.height) && (absoluteY + context.height > context.contentY);
+
 	constructor: {
 		this._topPadding = 0
 		if (parent) {
@@ -162,7 +167,14 @@ Object {
 	onVisibleChanged:		{ this._updateVisibility() }
 	onVisibleInViewChanged:	{ this._updateVisibility() }
 
-	onWidthChanged: 	{ this.style('width', value); this.boxChanged() }
+	Timer {
+		id: hack;
+		interval: 100;
+		running: true;
+		onTriggered: { this.parent._updateAbsoluteCoords() }
+	}
+
+	onWidthChanged: 	{ this.style('width', value); this.boxChanged()}
 	onHeightChanged:	{ this.style('height', value - this._topPadding); this.boxChanged() }
 
 	onXChanged,
@@ -173,6 +185,14 @@ Object {
 		else
 			this.style('left', x)
 		this.boxChanged()
+		hack.start()
+	}
+	
+	function _updateAbsoluteCoords() {
+		var absolute = this.element.dom.getBoundingClientRect()
+		this.absoluteX = absolute.x + window.pageXOffset
+		this.absoluteY = absolute.y + window.pageYOffset
+		context._updateContentScroll()
 	}
 
 	onYChanged,
@@ -183,6 +203,7 @@ Object {
 		else
 			this.style('top', y)
 		this.boxChanged()
+		hack.start()
 	}
 
 	onCssNullTranslate3DChanged: {
