@@ -166,7 +166,7 @@ BaseView {
 		var n = items.length
 		var w = this.width, h = this.height
 		if (this.trace)
-			log("layout " + n + " into " + w + "x" + h)
+			log("layout " + n + " into " + w + "x" + h + " @ " + this.content.x + "," + this.content.y)
 		var created = false
 		var x = 0, y = 0
 		var cx = this.content.x, cy = this.content.y
@@ -207,7 +207,7 @@ BaseView {
 			}
 
 			if (item) {
-				if (this.currentIndex === i) {
+				if (this.currentIndex === i && !item.focused) {
 					this.focusChild(item)
 					if (this.contentFollowsCurrentItem)
 						this.positionViewAtIndex(i)
@@ -257,9 +257,13 @@ BaseView {
 		this.style(style)
 	}
 
-	///@private
 	onFlowChanged: {
 		this._updateOverflow()
+		this._scheduleLayout()
+	}
+
+	onCellWidthChanged,
+	onCellHeightChanged: {
 		this._scheduleLayout()
 	}
 

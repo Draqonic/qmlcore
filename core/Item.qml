@@ -202,6 +202,8 @@ Object {
 	}
 	
 	function _updateAbsoluteCoords() {
+		if (!context)
+			return
 		var absolute = this.element.dom.getBoundingClientRect()
 		this.absoluteX = absolute.x + window.pageXOffset
 		this.absoluteY = absolute.y + window.pageYOffset

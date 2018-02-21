@@ -31,7 +31,7 @@ Item {
 		if (!source)
 			return
 
-		log('loading ' + source + '...')
+		log('loading ' + source + '…')
 		var path = source.split('.')
 		var ctor = _globals
 		while(path.length) {
@@ -57,6 +57,7 @@ Item {
 
 	///@internal
 	onCompleted: {
-		this._load()
+		if (!this.item && this.source)
+			this._load()
 	}
 }
