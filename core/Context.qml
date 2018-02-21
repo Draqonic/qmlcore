@@ -137,15 +137,15 @@ Item {
 	}
 
 	///@private
-	function _onCompleted(callback) {
-		this.scheduleAction(callback)
+	function _onCompleted(object, callback) {
+		this.scheduleAction(function() { callback.call(object) })
 	}
 
 	onFullscreenChanged: { if (value) this.backend.enterFullscreenMode(this.element); else this.backend.exitFullscreenMode(); }
 
-	///@private
-	function _complete() {
-		this._processActions()
+	///@internal
+	function scheduleComplete() {
+		this.delayedAction('completed', this, this._processActions)
 	}
 
 	///@private
@@ -160,7 +160,23 @@ Item {
 		return instance;
 	}
 
-	///@private
+	function wrapNativeCallback(callback) {
+		var ctx = this
+		return function() {
+			try {
+				var r = callback.apply(this, arguments)
+				ctx._processActions()
+				return r
+			} catch(ex) {
+				ctx._processActions()
+				throw ex
+			}
+		}
+	}
+
+	///@internal
+	///generally you don't need to call it yourself
+	///if you need to call it from native callback, use wrapNativeCallback method
 	function _processActions() {
 		if (!this._started || this._processingActions)
 			return
@@ -248,7 +264,7 @@ Item {
 		this.boxChanged()
 		log('Context: calling completed()')
 		this._started = true
-		this._complete()
+		this._processActions()
 		this._completed = true
 	}
 }

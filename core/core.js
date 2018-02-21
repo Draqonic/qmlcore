@@ -370,6 +370,19 @@ exports.addLazyProperty = function(proto, name, creator) {
 	})
 }
 
+exports.addConstProperty = function(proto, name, getter) {
+	Object.defineProperty(proto, name, {
+		get: function() {
+			return getter.call(this)
+		},
+
+		set: function(newValue) {
+			throw new Error('could not set const property')
+		},
+		enumerable: true
+	})
+}
+
 var PropertyStorage = function(value) {
 	this.value = value
 	this.onChanged = []
@@ -492,7 +505,12 @@ PropertyStoragePrototype.callOnChanged = function(object, name, value) {
 		handlers.forEach(invoker)
 }
 
-
+PropertyStoragePrototype.removeOnChanged = function(callback) {
+	var handlers = this.onChanged
+	var idx = handlers.indexOf(callback)
+	if (idx >= 0)
+		return handlers.splice(idx, 1)
+}
 
 exports.addProperty = function(proto, type, name, defaultValue) {
 	var convert
@@ -588,7 +606,7 @@ exports.addProperty = function(proto, type, name, defaultValue) {
 
 			var duration = animation.duration
 
-			var nextFrame = function() {
+			var nextFrame = context.wrapNativeCallback(function() {
 				var now = Date.now()
 				var t = 1.0 * (now - storage.started) / duration
 				if (t >= 1 || !animation.active()) {
@@ -598,8 +616,7 @@ exports.addProperty = function(proto, type, name, defaultValue) {
 					storage.callOnChanged(self, name, storage.getCurrentValue(defaultValue), src)
 					storage.frameRequest = backend.requestAnimationFrame(nextFrame)
 				}
-				context._processActions() //fixme: handle exception, create helper in core, e.g. wrapNativeCallback(), port existing html5 code
-			}
+			})
 
 			storage.frameRequest = backend.requestAnimationFrame(nextFrame)
 
@@ -676,7 +693,7 @@ exports.core.EventBinder.prototype.enable = function(value) {
 }
 
 var protoEvent = function(prefix, proto, name, callback) {
-	var sname = '__' + prefix + '__' + name
+	var sname = prefix + '__' + name
 	//if property was in base prototype, create shallow copy and put our handler there or we would add to base prototype's array
 	var ownStorage = proto.hasOwnProperty(sname)
 	var storage = proto[sname]
@@ -693,13 +710,13 @@ var protoEvent = function(prefix, proto, name, callback) {
 }
 
 exports.core._protoOn = function(proto, name, callback)
-{ protoEvent('on', proto, name, callback) }
+{ protoEvent('__on', proto, name, callback) }
 
 exports.core._protoOnChanged = function(proto, name, callback)
-{ protoEvent('changed', proto, name, callback) }
+{ protoEvent('__changed', proto, name, callback) }
 
 exports.core._protoOnKey = function(proto, name, callback)
-{ protoEvent('key', proto, name, callback) }
+{ protoEvent('__key', proto, name, callback) }
 
 var ObjectEnumerator = function(callback) {
 	this._callback = callback

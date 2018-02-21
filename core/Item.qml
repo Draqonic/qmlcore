@@ -27,14 +27,15 @@ Object {
 	property lazy transform: Transform { }
 	property bool cssTranslatePositioning;
 	property bool cssNullTranslate3D;
+	property bool cssDelegateAlwaysVisibleOnAcceleratedSurfaces: true;
 
-	property lazy left:		AnchorLine	{ boxIndex: 0; }
-	property lazy top:		AnchorLine	{ boxIndex: 1; }
-	property lazy right:	AnchorLine	{ boxIndex: 2; }
-	property lazy bottom:	AnchorLine	{ boxIndex: 3; }
+	property const left: 	{ return [this, 0]; }
+	property const top: 	{ return [this, 1]; }
+	property const right:	{ return [this, 2]; }
+	property const bottom:	{ return [this, 3]; }
 
-	property lazy horizontalCenter:	AnchorLine	{ boxIndex: 4; }
-	property lazy verticalCenter:	AnchorLine	{ boxIndex: 5; }
+	property const horizontalCenter:	{ return [this, 4]; }
+	property const verticalCenter:		{ return [this, 5]; }
 
 	//do not use, view internal
 	signal boxChanged;						///< emitted when position or size changed
@@ -49,6 +50,7 @@ Object {
 	property bool visibleY: absoluteY !== -1 && context.contentMaxY && (absoluteY < context.contentY + context.height) && (absoluteY + context.height > context.contentY);
 
 	constructor: {
+		this._pressedHandlers = {}
 		this._topPadding = 0
 		if (parent) {
 			if (this.element)
@@ -62,6 +64,7 @@ Object {
 	function discard() {
 		_globals.core.Object.prototype.discard.apply(this)
 		this.focusedChild = null
+		this._pressedHandlers = {}
 		if (this.element)
 			this.element.discard()
 	}
@@ -112,7 +115,7 @@ Object {
 		while(item) {
 			x += item.x
 			y += item.y
-			if ('view' in item) {
+			if (item.hasOwnProperty('view')) {
 				x += item.viewX + item.view.content.x
 				y += item.viewY + item.view.content.y
 			}
@@ -141,9 +144,19 @@ Object {
 	function _updateVisibility() {
 		var visible = this.visible && this.visibleInView
 
-		if (this.element) {
-			this.style('visibility', visible? 'inherit': 'hidden')
+		var updateStyle = true
+		var view = this.view
+		if (view !== undefined) {
+			var content = view.content
+			//do not update real style for individual delegate in case of hardware accelerated surfaces
+			//it may trigger large invisible repaints
+			//consider this as default in the future.
+			if (content.cssDelegateAlwaysVisibleOnAcceleratedSurfaces && (content.cssTranslatePositioning || content.cssNullTranslate3D) && !$manifest$cssDisableTransformations)
+				updateStyle = false
 		}
+
+		if (updateStyle)
+			this.style('visibility', visible? 'inherit': 'hidden')
 
 		this.recursiveVisible = visible && (this.parent !== null? this.parent.recursiveVisible: true)
 	}
@@ -180,7 +193,7 @@ Object {
 	onXChanged,
 	onViewXChanged: {
 		var x = this.x + this.viewX
-		if (this.cssTranslatePositioning)
+		if (this.cssTranslatePositioning && !$manifest$cssDisableTransformations)
 			this.transform.translateX = x
 		else
 			this.style('left', x)
@@ -198,7 +211,7 @@ Object {
 	onYChanged,
 	onViewYChanged: {
 		var y = this.y + this.viewY
-		if (this.cssTranslatePositioning)
+		if (this.cssTranslatePositioning && !$manifest$cssDisableTransformations)
 			this.transform.translateY = y
 		else
 			this.style('top', y)
@@ -207,10 +220,8 @@ Object {
 	}
 
 	onCssNullTranslate3DChanged: {
-		if (value)
-			this.style('transform', 'translate3d(0, 0, 0)')
-		else
-			this.style('transform', '')
+		if (!$manifest$cssDisableTransformations)
+			this.style('transform', value ? 'translateZ(0)' : '')
 	}
 
 	onOpacityChanged:	{ if (this.element) this.style('opacity', value); }
@@ -339,11 +350,10 @@ Object {
 
 		if (key !== undefined) {
 			if (this.keyProcessDelay) {
-				if (eventTime !== this._lastEvent && eventTime - this.keyProcessDelay < this._lastEvent)
+				if (this._lastEvent && eventTime - this._lastEvent < this.keyProcessDelay)
 					return true
 
-				if (this._lastEvent !== eventTime)
-					this._lastEvent = eventTime
+				this._lastEvent = eventTime
 			}
 
 			//fixme: create invoker only if any of handlers exist
@@ -368,6 +378,21 @@ Object {
 		return false
 	}
 
+	///@private registers key handler
+	function onPressed (name, callback) {
+		var wrapper
+		if (name != 'Key')
+			wrapper = function(key, event) { event.accepted = true; callback(key, event); return event.accepted }
+		else
+			wrapper = callback;
+
+		if (name in this._pressedHandlers)
+			this._pressedHandlers[name].push(wrapper);
+		else
+			this._pressedHandlers[name] = [wrapper];
+	}
+
+	/// outputs component path in qml (e.g Rectangle → Item → ListItem → Rectangle)
 	function getComponentPath() {
 		var path = []
 		var self = this

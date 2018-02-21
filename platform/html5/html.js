@@ -9,7 +9,7 @@ exports.createAddRule = function(style) {
 			try {
 				sheet.addRule(name, rules)
 			} catch(e) {
-				log("InsertRule failed:", e)
+				log("AddRule failed:", e, ", sheet:", sheet, ", name:", name, ", rules:", rules)
 			}
 		}
 	}
@@ -19,7 +19,7 @@ exports.createAddRule = function(style) {
 			try {
 				sheet.insertRule(name + '{' + rules + '}', sheet.cssRules.length)
 			} catch(e) {
-				log("InsertRule failed:", e)
+				log("InsertRule failed:", e, ", sheet:", sheet, ", name:", name, ", rules:", rules)
 			}
 		}
 	}
@@ -146,14 +146,9 @@ var registerGenericListener = function(target) {
 			var context = target._context
 			//log('registering generic event', name)
 			var pname = prefix + name
-			var callback = target[pname] = function() {
-				try { target.emitWithArgs(name, arguments) }
-				catch(ex) {
-					context._processActions()
-					throw ex
-				}
-				context._processActions()
-			}
+			var callback = target[pname] = context.wrapNativeCallback(function() {
+				target.emitWithArgs(name, arguments)
+			})
 			target.dom.addEventListener(name, callback)
 		},
 		function(name) {
@@ -472,11 +467,15 @@ exports.init = function(ctx) {
 		body.append(div);
 	}
 
-	ctx._textCanvas = html.createElement(ctx, 'canvas')
-	ctx._textCanvas.style('width', 0)
-	ctx._textCanvas.style('height', 0)
-	div.append(ctx._textCanvas)
-	ctx._textCanvasContext = ('getContext' in ctx._textCanvas.dom)? ctx._textCanvas.dom.getContext('2d'): null
+	if (Modernizr.canvastext) {
+		ctx._textCanvas = html.createElement(ctx, 'canvas')
+		ctx._textCanvas.style('width', 0)
+		ctx._textCanvas.style('height', 0)
+		div.append(ctx._textCanvas)
+		ctx._textCanvasContext = ('getContext' in ctx._textCanvas.dom)? ctx._textCanvas.dom.getContext('2d'): null
+	} else {
+		ctx._textCanvasContext = null
+	}
 
 	ctx.element = div
 	ctx.width = w
@@ -786,7 +785,7 @@ var cssMappings = {
 
 ///@private tries to set animation on name using css transitions, returns true on success
 exports.setAnimation = function (component, name, animation) {
-	if (!exports.capabilities.csstransitions || (animation && !animation.cssTransition))
+	if (!exports.capabilities.csstransitions || $manifest$cssDisableTransitions || (animation && !animation.cssTransition))
 		return false
 
 	var css = cssMappings[name]
