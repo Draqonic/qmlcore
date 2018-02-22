@@ -764,6 +764,6 @@ String.prototype.arg = function (arg) {
 			return str
 		}
 	}
-	log("string.arg: Argument missing: %1, %2".arg(this).arg(arg))
+	log("string.arg: Argument missing: '%1', arg: '%2'".arg(this).arg(arg))
 	return this;
 };
