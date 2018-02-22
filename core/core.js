@@ -195,7 +195,6 @@ var colorTable = {
 	'whitesmoke':			'f5f5f5',
 	'yellow':				'ffff00',
 	'yellowgreen':			'9acd32',
-	'dark':					'080808',
 	'': 					'',
 	'transparent': 			'0000'
 }

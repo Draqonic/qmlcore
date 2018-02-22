@@ -4,6 +4,7 @@ Item {
 	property color color;		///< color of the text
 	property lazy shadow: Shadow { }	///< text shadow object
 	property lazy font: Font { }	///< text font object
+	signal fontChanged;
 	property enum horizontalAlignment { AlignLeft, AlignRight, AlignHCenter, AlignJustify };	///< text horizontal alignment
 	property enum verticalAlignment { AlignTop, AlignBottom, AlignVCenter };	///< text vertical alignment
 	property enum wrapMode { NoWrap, WordWrap, WrapAnywhere, Wrap };	///< multiline text wrap mode
