@@ -52,5 +52,6 @@ Object {
  		case this.SmallCaps: this.parent.style('font-variant', 'small-caps'); break
  		case this.Capitalize: this.parent.style('text-transform', 'capitalize'); break
  		}
+ 		this._updateParentSize()
 	}
 }
