@@ -44,6 +44,7 @@ Object {
 
 	property int keyProcessDelay;			///< delay time between key pressed events
 
+	property bool absoluteEnabled;
 	property int absoluteX: -1;
 	property int absoluteY: -1;
 	property bool visibleX: absoluteX !== -1 && context.contentMaxX && (absoluteX < context.contentX + context.width) && (absoluteX + context.width > context.contentX);
@@ -198,7 +199,8 @@ Object {
 		else
 			this.style('left', x)
 		this.boxChanged()
-		hack.start()
+		if (hack && this.absoluteEnabled)
+			hack.start()
 	}
 	
 	function _updateAbsoluteCoords() {
@@ -218,7 +220,8 @@ Object {
 		else
 			this.style('top', y)
 		this.boxChanged()
-		hack.start()
+		if (hack && this.absoluteEnabled)
+			hack.start()
 	}
 
 	onCssNullTranslate3DChanged: {
@@ -229,7 +232,21 @@ Object {
 	onOpacityChanged:	{ if (this.element) this.style('opacity', value); }
 	onRotationChanged:	{ this.transform.rotateZ = this.rotation }
 	onZChanged:			{ this.style('z-index', value) }
-	onRadiusChanged:	{ this.style('border-radius', value) }
+	onRadiusChanged:	{
+		var radius = value
+		switch(radius.length) {
+		case 2:
+			radius = "%1px %2px".arg(value[0]).arg(value[1])
+			break
+		case 3:
+			radius = "%1px %2px %3px".arg(value[0]).arg(value[1]).arg(value[2])
+			break
+		case 4:
+			radius = "%1px %2px %3px %4px".arg(value[0]).arg(value[1]).arg(value[2]).arg(value[3])
+			break
+		}
+		this.style('border-radius', radius)
+	}
 	onScaleChanged: { this.transform.scaleX = this.scale; this.transform.scaleY = this.scale; }
 	onClipChanged:		{ this.style('overflow', value? 'hidden': 'visible') }
 	onFixedChanged:		{ this.style('position', value ? 'fixed' :  'absolute') }

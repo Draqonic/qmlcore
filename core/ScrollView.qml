@@ -3,44 +3,30 @@ Item {
 	property enum verticalScrollBarPolicy	{ ScrollBarAsNeeded, ScrollBarAlwaysOff, ScrollBarAlwaysOn };
 
 	property bool atXBeginning: !contentX;
-	property bool atXEnd: contentX >= contentMaxX;
+	property bool atXEnd: contentX >= contentWidth - width;
 	property bool atYBeginning: !contentY;
-	property bool atYEnd: contentY >= contentMaxY;
+	property bool atYEnd: contentY >= contentHeight - height;
 	property int contentX;
 	property int contentY;
 	property int contentWidth;
 	property int contentHeight;
-	property int contentMaxX;
-	property int contentMaxY;
 	signal scrolling;
+
+	function _updateScrollProperties() {
+		var element = this.element.dom
+		this.contentX = element.scrollLeft
+		this.contentY = element.scrollTop
+		this.contentWidth = element.scrollWidth
+		this.contentHeight = element.scrollHeight
+		this.scrolling()
+	}
 
 	constructor: {
 		this.style({ 'overflow-x': 'hidden', 'overflow-y': 'auto' })
-
-		this.element.dom.onscroll = function() {
-			this.contentX = this.element.dom.scrollLeft
-			this.contentY = this.element.dom.scrollTop
-			this.contentMaxX = this.element.dom.scrollLeftMax
-			this.contentMaxY = this.element.dom.scrollTopMax
-			this.contentWidth = this.element.dom.scrollWidth
-			this.contentHeight = this.element.dom.scrollHeight
-			this.scrolling()
-		}.bind(this);
+		this.element.dom.onscroll = context.wrapNativeCallback(this._updateScrollProperties.bind(this))
 	}
 
-	onCompleted: { hack.start() }
-
-	Timer {
-		id: hack;
-		interval: 100;
-		onTriggered: {
-			this.contentMaxX = this.element.dom.scrollLeftMax
-			this.contentMaxY = this.element.dom.scrollTopMax
-			this.contentWidth = this.element.dom.scrollWidth
-			this.contentHeight = this.element.dom.scrollHeight
-		}
-	}
-
+	/// scroll
 	function scroll(x, y) {
 		this.element.dom.scroll({
 			left: x,
