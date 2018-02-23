@@ -6,7 +6,7 @@ Object {
 	property int width;						///< width of visible area
 	property int height;					///< height of visible area
 	property bool clip;						///< clip all children outside rectangular area defined by x, y, width, height
-	property var radius;					///< round corner radius, also with support for values like "15px 50px 30px 5px"
+	property real radius;					///< round corner radius
 	property real scale: 1;
 	property bool fixed;
 
@@ -232,25 +232,11 @@ Object {
 	onOpacityChanged:	{ if (this.element) this.style('opacity', value); }
 	onRotationChanged:	{ this.transform.rotateZ = this.rotation }
 	onZChanged:			{ this.style('z-index', value) }
-	onRadiusChanged:	{
-		var radius = value
-		switch(radius.length) {
-		case 2:
-			radius = "%1px %2px".arg(value[0]).arg(value[1])
-			break
-		case 3:
-			radius = "%1px %2px %3px".arg(value[0]).arg(value[1]).arg(value[2])
-			break
-		case 4:
-			radius = "%1px %2px %3px %4px".arg(value[0]).arg(value[1]).arg(value[2]).arg(value[3])
-			break
-		}
-		this.style('border-radius', radius)
-	}
-	onScaleChanged: { this.transform.scaleX = this.scale; this.transform.scaleY = this.scale; }
+	onRadiusChanged:	{ this.style('border-radius', value) }
+	onScaleChanged:		{ this.transform.scaleX = this.scale; this.transform.scaleY = this.scale; }
 	onClipChanged:		{ this.style('overflow', value? 'hidden': 'visible') }
 	onFixedChanged:		{ this.style('position', value ? 'fixed' :  'absolute') }
-	onClassChanged: { this.element.dom.setAttribute('class', value) }
+	onClassChanged:		{ this.element.dom.setAttribute('class', value) }
 
 	///@private sets current global focus to component
 	function forceActiveFocus() {
