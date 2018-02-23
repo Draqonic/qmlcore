@@ -25,6 +25,7 @@ Object {
 	property lazy anchors: Anchors { }
 	property lazy effects: Effects { }
 	property lazy transform: Transform { }
+	property lazy border: Border {}		///< object holding properties of the border
 	property bool cssTranslatePositioning;
 	property bool cssNullTranslate3D;
 	property bool cssDelegateAlwaysVisibleOnAcceleratedSurfaces: true;
