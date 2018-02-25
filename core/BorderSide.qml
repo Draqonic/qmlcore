@@ -9,10 +9,11 @@ Object {
 	property color color: parent.color;
 	property int style: parent.style;
 
+	///@private
 	function _updateStyle() {
 		if (!this.parent || !this.parent.parent || !this.name)
 			return
-		
+
 		var styleName
 		switch(this.style) {
  		case Border.None: styleName = 'none'; break
@@ -26,13 +27,12 @@ Object {
  		case Border.Inset: styleName = 'inset'; break
  		case Border.Outset: styleName = 'outset'; break
  		}
-			
-		var bordercss = this.width + "px " + styleName + " " + _globals.core.normalizeColor(this.color)
-		this.parent.parent.style('border-' + this.name, bordercss)
-		if (this.name === "left" || this.name === "top")
-			this.parent.parent.style('margin-' + this.name, -this.width)
+
+		var borderCss = this.width + "px " + styleName + " " + _globals.core.normalizeColor(this.color)
+		this.parent.parent.style('border-' + this.name, borderCss)
 	}
 
+	///@private
 	onWidthChanged,
 	onColorChanged,
 	onStyleChanged: { this._updateStyle() }
