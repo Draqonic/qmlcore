@@ -1,7 +1,7 @@
 /// item with text
 Item {
 	property string text;		///< text to be displayed
-	property color color;		///< color of the text
+	property color color: "black";		///< color of the text
 	property lazy shadow: Shadow { }	///< text shadow object
 	property lazy font: Font { }	///< text font object
 	signal fontChanged;
@@ -20,6 +20,10 @@ Item {
 		this._context.backend.initText(this)
 		if (this.text.length > 0)
 			this._setText(this.text)
+	}
+	
+	function toString() {
+		return "Text (color: " + this.color + ", width: " + this.paintedWidth + ", height: " + this.paintedHeight + ", x: " + this.x + ", y: " + this.y + ")"
 	}
 
 	function getClass() { return 'core-text' }

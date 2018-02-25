@@ -6,6 +6,10 @@ Item {
 		this._context.backend.initRectangle(this)
 		this.style('background-color', _globals.core.normalizeColor(this.color))
 	}
+	
+	function toString() {
+		return "Rectangle (color: " + this.color + ", width: " + this.width + ", height: " + this.height + ", x: " + this.x + ", y: " + this.y + ")"
+	}
 
 	onColorChanged: {
 		this.style('background-color', _globals.core.normalizeColor(value))

@@ -62,6 +62,10 @@ Object {
 		} //no parent == top level element, skip
 	}
 
+	function toString() {
+		return "Item (width: " + this.width + ", height: " + this.height + ", x: " + this.x + ", y: " + this.y + ")"
+	}
+
 	///@private
 	function discard() {
 		_globals.core.Object.prototype.discard.apply(this)
