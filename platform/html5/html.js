@@ -1,5 +1,13 @@
 /*** @using { core.RAIIEventEmitter } **/
 
+var Modernizr = window.Modernizr
+
+exports.capabilities = {
+	csstransforms3d: Modernizr.csstransforms3d,
+	csstransforms: Modernizr.csstransforms,
+	csstransitions: Modernizr.csstransitions
+}
+
 var imageCache = null
 
 exports.createAddRule = function(style) {
@@ -96,7 +104,7 @@ StyleClassifierPrototype.register = function(rules) {
 	if (cls !== undefined)
 		return cls
 
-	var cls = classes[rule] = this.prefix + this.classes_total++
+	cls = classes[rule] = this.prefix + this.classes_total++
 	this._addRule('.' + cls, rule)
 	return cls
 }
@@ -139,22 +147,30 @@ var getPrefixedName = function(name) {
 
 exports.getPrefixedName = getPrefixedName
 
+var passiveListeners = ['touchstart', 'touchend', 'wheel', 'scroll']
+var passiveArg = Modernizr.passiveeventlisteners ? {passive: true} : false
+
 var registerGenericListener = function(target) {
-	var prefix = '_domEventHandler_'
+	var storage = target.__domEventListeners
+	if (storage === undefined)
+		storage = target.__domEventListeners = {}
+
 	target.onListener('',
 		function(name) {
-			var context = target._context
 			//log('registering generic event', name)
-			var pname = prefix + name
-			var callback = target[pname] = context.wrapNativeCallback(function() {
+			var callback = storage[name] = target._context.wrapNativeCallback(function() {
 				target.emitWithArgs(name, arguments)
 			})
-			target.dom.addEventListener(name, callback)
+
+			var args = [name, callback]
+			if (passiveListeners.indexOf(name) >= 0)
+				args.push(passiveArg)
+
+			target.dom.addEventListener.apply(target.dom, args)
 		},
 		function(name) {
 			//log('removing generic event', name)
-			var pname = prefix + name
-			target.dom.removeEventListener(name, target[pname])
+			target.dom.removeEventListener(name, storage[name])
 		}
 	)
 }
@@ -790,14 +806,6 @@ exports.setAnimation = function (component, name, animation) {
 
 	var css = cssMappings[name]
 	return css !== undefined? setTransition(component, css, animation): false
-}
-
-var Modernizr = window.Modernizr
-
-exports.capabilities = {
-	csstransforms3d: Modernizr.csstransforms3d,
-	csstransforms: Modernizr.csstransforms,
-	csstransitions: Modernizr.csstransitions
 }
 
 exports.requestAnimationFrame = Modernizr.prefixed('requestAnimationFrame', window)	|| function(callback) { return setTimeout(callback, 0) }
