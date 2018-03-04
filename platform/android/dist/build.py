@@ -16,11 +16,12 @@ def build(app, title):
     os.chdir(app)
     os.system('cordova platform add android')
     os.system('cordova plugin add cordova-plugin-streaming-media')
+    os.system('cordova plugin add cordova-plugin-device')
     os.system('cordova build android')
     os.chdir('..')
 
 
-parser = argparse.ArgumentParser('qmlcore build tool')
+parser = argparse.ArgumentParser('pureqml cordova android build tool')
 parser.add_argument('--app', '-a', help='application name', default="app")
 parser.add_argument('--title', '-t', help='application title', default="App")
 args = parser.parse_args()
