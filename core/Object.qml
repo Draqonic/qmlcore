@@ -119,8 +119,8 @@ EventEmitter {
 	}
 
 	/// @private replaces dynamic value updater
-	function _replaceUpdater (name, newUpdaters) {
-		this._createPropertyStorage(name).replaceUpdater(this, newUpdaters)
+	function _replaceUpdater (name, callback, deps) {
+		this._createPropertyStorage(name).replaceUpdater(this, callback, deps)
 	}
 
 	///@private creates property storage
