@@ -69,7 +69,9 @@ Object {
 		if (this._disabledFontChanged) return
  		if (value <= 0) {
  			console.warn("Pixel size <= 0, must be greater than 0")
+ 			this._disabledFontChanged = true
  			this.pixelSize = Math.round(this.pointSize * 1.32)
+ 			this._disabledFontChanged = false
  			return
  		}
  		this._disabledFontChanged = true
@@ -82,7 +84,9 @@ Object {
  		if (this._disabledFontChanged) return
  		if (value <= 0) {
  			console.warn("Point size <= 0, must be greater than 0")
+ 			this._disabledFontChanged = true
  			this.pointSize = this.pixelSize * 0.75
+ 			this._disabledFontChanged = false
  			return
  		}
  		this._disabledFontChanged = true
