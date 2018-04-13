@@ -116,7 +116,7 @@ class Compiler(object):
 				package_name = str(root_manifest.package)
 
 			for dirpath, dirnames, filenames in os.walk(project_dir, topdown = True):
-				dirnames[:] = [name for name in dirnames if name[:6] != 'build.']
+				dirnames[:] = filter(lambda name: not name[:6].startswith("build.") and name != "dist", dirnames)
 				if '.nocompile' in filenames:
 					dirnames[:] = []
 					continue
@@ -147,6 +147,7 @@ class Compiler(object):
 						relpath = relpath.split(os.path.sep)
 
 					package = ".".join([package_name] + relpath)
+					self.component_path_map[filename] = dirpath
 					promise = self.process_file(pool, generator, package, dirpath, filename)
 					if promise is not None:
 						promises.append(promise)
@@ -207,7 +208,7 @@ class Compiler(object):
 
 		def write_properties(prefix, props):
 			r = ''
-			for k, v in props.iteritems():
+			for k, v in sorted(props.iteritems()):
 				k = compiler.js.escape_id(k)
 				if isinstance(v, dict):
 					r += write_properties(prefix + '$' + k, v)
@@ -225,11 +226,11 @@ class Compiler(object):
 			f.write(appcode.encode('utf-8'))
 
 		if self.documentation:
-			self.documentation.generate()
+			self.documentation.generate(self.component_path_map)
 
 		print "done"
 
-	def __init__(self, output_dir, root, project_dirs, root_manifest, app, doc = None, doc_format = None, release = False, verbose = False, jobs = 1):
+	def __init__(self, output_dir, root, project_dirs, root_manifest, app, doc = None, release = False, verbose = False, jobs = 1):
 		self.cache = Cache()
 		self.root = root
 		self.output_dir = output_dir
@@ -241,6 +242,7 @@ class Compiler(object):
 		self.release = release
 		self.verbose = verbose
 		self.jobs = int(jobs) if jobs is not None else cpu_count()
+		self.component_path_map = {}
 
 		if self.verbose:
 			print 'running using %d jobs' %self.jobs
@@ -248,15 +250,10 @@ class Compiler(object):
 		with open(os.path.join(root, 'partners.json')) as f:
 			self.partners = json.load(f)
 
-		if doc_format == "qml":
-		    self.documentation = compiler.doc.qml.Documentation(doc) if doc else None
-		elif doc_format == "json":
-		    self.documentation = compiler.doc.json.Documentation(doc) if doc else None
-		else:
-		    self.documentation = compiler.doc.md.Documentation(doc) if doc else None
+		self.documentation = compiler.doc.json.Documentation(doc) if doc else None
 
 
-def compile_qml(output_dir, root, project_dirs, root_manifest, app, wait = False, doc = None, doc_format = None, release = False, verbose = False, jobs = 1):
+def compile_qml(output_dir, root, project_dirs, root_manifest, app, wait = False, doc = None, release = False, verbose = False, jobs = 1):
 	if wait:
 		try:
 			import pyinotify
@@ -289,7 +286,7 @@ def compile_qml(output_dir, root, project_dirs, root_manifest, app, wait = False
 		except:
 			raise Exception("seems that you don't have pyinotify module installed, you can't use -w without it")
 
-	c = Compiler(output_dir, root, project_dirs, root_manifest, app, doc=doc, doc_format=doc_format, release=release, verbose=verbose, jobs=jobs)
+	c = Compiler(output_dir, root, project_dirs, root_manifest, app, doc=doc, release=release, verbose=verbose, jobs=jobs)
 
 	notifier = None
 

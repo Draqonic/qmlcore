@@ -238,7 +238,7 @@ Item {
 			text = contexts[name] //fixme: add context handling here
 			break
 		}
-		return text
+		return text.replace(/%(\d+)/, function(text, index) { return args[index] })
 	}
 
 	function processKey(event) {

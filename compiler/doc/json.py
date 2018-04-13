@@ -1,7 +1,7 @@
 import re
 import os
 import os.path
-import compiler.lang as lang
+
 
 class Component(object):
 	def __init__(self, package, name, component):
@@ -12,10 +12,10 @@ class Component(object):
 
 	def generate_section(self, r, title, values, comma):
 		if not hasattr(values[-1], "name"):
-                    return
+			return
 
 		last = values[-1].name
-		r.append('\t\t"%s": {' %title)
+		r.append('\t\t"%s": {' % title)
 
 		for value in values:
 			localComma = "" if last == value.name else ","
@@ -23,39 +23,33 @@ class Component(object):
 			docLines = docText.splitlines()
 			docText = docText.replace("\n", " ")
 
-			internal = "true" if (value.doc is not None) and ("@private" in value.doc.text or "@internal" in value.doc.text) else "false"
 			category = value.__class__.__name__
+
+			forceInternal = category == 'Method' and (re.match("^on.*Changed$", value.name[0]) or \
+													  value.name[0] == "onCompleted" or \
+													  value.name[0] == "constructor")
+
+			internal = bool(forceInternal) or ((value.doc is not None) and ("@private" in value.doc.text or "@internal" in value.doc.text))
+			internal = str(internal).lower()
 
 			ref = '"ref": "' + value.ref + '", ' if hasattr(value, 'ref') else ""
 
-			if category == 'Method':
-				if re.match("^on.*Changed$", value.name[0]) or value.name[0] == "onCompleted":
-					internal = "true"
-
 			if category == 'Property':
-				r.append('\t\t\t"%s": { "text": "%s", %s"internal": %s, "type": "%s", "defaultValue": "%s" }%s' %(value.name, docText, ref, internal, value.type, value.defaultValue, localComma))
+				r.append('\t\t\t"%s": { "text": "%s", %s"internal": %s, "type": "%s", "defaultValue": "%s" }%s' %
+						 (value.name, docText, ref, internal, value.type, value.defaultValue, localComma))
 			elif category == 'Method' and docText:
 				argText = ""
 				argText += '"params": ['
 				paramCount = 0
+				descriptionAtLastLine = True
 				for line in docLines:
-					line = line.rstrip()
-					line = line.lstrip()
-					argIdx = line.find("@param")
-					if argIdx < 0:
+					m = re.match(r'^.*@param\s+(?P<b>{)?(?P<t1>\w+)(?(b)} |:)(?P<t2>\w+)(?(b)\s*-\s*|\s*)(?P<text>.*)$',
+								 line.strip())
+					if not m:
 						continue
-					paramTokens = line.split(' ')
-					if len(paramTokens) <= 1:
-						continue
-					param = paramTokens[1].split(":")
-					if len(param) <= 1:
-						continue
-					paramName = param[0]
-					paramType = param[1]
-
-					paramText = line[line.find(paramType) + len(paramType) + 1:]
-					paramText = paramText.lstrip()
-					paramText = paramText.rstrip()
+					descriptionAtLastLine = descriptionAtLastLine and not m.group('b')
+					paramName, paramType = (m.group('t2'), m.group('t1')) if m.group('b') else (m.group('t1'), m.group('t2'))
+					paramText = m.group('text').strip()
 
 					argText += '{ "name": "' + paramName + '", "type": "' + paramType + '", "text": "' + paramText + '" }'
 					argText += ", "
@@ -64,13 +58,10 @@ class Component(object):
 					argText = argText[0:-2]
 				argText += "], "
 
-				docText = docLines[-1]
-				docText = docText.lstrip()
-				docText = docText.rstrip()
+				docText = (docLines[-1] if descriptionAtLastLine else docLines[0]).strip(' *')
 
 				r.append('\t\t\t"%s": { "text": "%s", %s"internal": %s }%s' %(value.name[0], docText, argText, internal, localComma))
 			else:
-				docText.replace("\n", " ")
 				itemName = value.name if isinstance(value.name, basestring) else value.name[0]
 				r.append('\t\t\t"%s": { "text": "%s", "internal": %s }%s' %(itemName, docText, internal, localComma))
 
@@ -81,7 +72,7 @@ class Component(object):
 			r.append('\t\t}')
 
 
-	def process_children(self, r, package):
+	def process_children(self, r, component_path_map):
 		component = self.component
 
 		children = {}
@@ -95,7 +86,11 @@ class Component(object):
 			if (category == "Property"):
 				child.name = child.properties[0][0]
 				if hasattr(child.properties[0][1], "children"):
-					child.ref = package + "/" + child.type
+					component_file_name = child.type + ".qml"
+					if component_path_map.has_key(component_file_name):
+						component_dir = component_path_map[component_file_name][2:]
+						component_dir = component_dir.replace("/", ".")
+						child.ref = component_dir + "/" + component_file_name[:-4]
 					child.defaultValue = child.properties[0][1].name
 				else:
 					child.defaultValue = child.properties[0][1][1:-1] if child.properties[0][1] is not None else ""
@@ -120,9 +115,6 @@ class Component(object):
 		if 'Method' in children:
 			data.append(('Method', 'Methods'))
 
-		# if 'Constructor' in children:
-			# data.append(('Constructor', 'Constructors'))
-
 		if len(data) == 0:
 			return r
 
@@ -137,7 +129,7 @@ class Component(object):
 		if component.doc:
 			r.append(component.doc)
 
-	def generate(self, documentation, package):
+	def generate(self, documentation, package, component_path_map):
 		r = []
 		package, name = self.package, self.name
 		r.append('{' )
@@ -146,7 +138,7 @@ class Component(object):
 		r.append('\t"text": "%s",' %(comp.doc.text.replace("\n", " ") if hasattr(comp, "doc") and hasattr(comp.doc, "text") else ""))
 		r.append('')
 		r.append('\t"content": {')
-		self.process_children(r, package)
+		self.process_children(r, component_path_map)
 		r.append('\t}')
 		r.append('}')
 		return '\n'.join(r)
@@ -169,9 +161,11 @@ class Documentation(object):
 	def generate_component(self, package, name, component):
 		#print package, name, component
 		with open(os.path.join(self.jsonroot, package, name + '.json'), 'wt') as f:
-			f.write(component.generate(self, package))
+			f.write(component.generate(self, package, self.component_path_map))
 
-	def generate(self):
+	def generate(self, component_path_map):
+		self.component_path_map = component_path_map
+
 		if not os.path.exists(self.jsonroot):
 			os.makedirs(self.jsonroot)
 
