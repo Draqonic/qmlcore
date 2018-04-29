@@ -1,5 +1,6 @@
 /// object to hold named property synced with underlying storage
 LocalStorage {
+	signal ready;					///< the value now in a sync state with underlying storage
 	property string name;			///< stored property key name
 	property string value;			///< stored property value
 	property string defaultValue;	///< default init value
@@ -13,15 +14,16 @@ LocalStorage {
 	///@private
 	_read: {
 		this._checkNameValid()
-		this.get(this.name,
-			function(value) { this._setProperty('value', value) }.bind(this),
-			function() { this._setProperty('value', this.defaultValue) }.bind(this))
+		this.getOrDefault(this.name, function(value) {
+			this._setProperty('value', value)
+			this.ready()
+		}.bind(this), this.defaultValue)
 	}
 
 	///@private
 	_write: {
 		this._checkNameValid()
-		if (this.value !== undefined && this.value !== null)
+		if (this.value)
 			this.set(this.name, this.value)
 		else
 			this.erase(this.name)
@@ -32,7 +34,14 @@ LocalStorage {
 
 	///@private
 	onNameChanged: {
-		this._setProperty('value', undefined)
+		this._setProperty('value', '')
 		this._read()
+	}
+
+	onCompleted: {
+		if (this.value) {
+			this._setProperty('value', this.value)
+			this.ready()
+		}
 	}
 }
