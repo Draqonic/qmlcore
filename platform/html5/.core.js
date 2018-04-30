@@ -24,19 +24,20 @@ if (!exports.core.vendor) {
 	_checkDevice('iPod', { 'vendor': 'apple', 'device': 2, 'os': 'iOS' })
 }
 
-if (exports.core.userAgent.indexOf('Chromium') >= 0)
-	exports.core.browser = "Chromium"
-else if (exports.core.userAgent.indexOf('Chrome') >= 0)
+// TODO: check on mobile, check Opera/Yandex/Vivaldi
+if (exports.core.userAgent.indexOf('Edge') !== -1)
+	exports.core.browser = "Edge"
+else if (exports.core.userAgent.indexOf('Chrome/') !== -1 || exports.core.userAgent.indexOf('Chromium') !== -1)
 	exports.core.browser = "Chrome"
-else if (exports.core.userAgent.indexOf('Opera') >= 0)
+else if (exports.core.userAgent.indexOf('Opera/') !== -1)
 	exports.core.browser = "Opera"
-else if (exports.core.userAgent.indexOf('Firefox') >= 0)
+else if (exports.core.userAgent.indexOf('Firefox/') !== -1)
 	exports.core.browser = "Firefox"
-else if (exports.core.userAgent.indexOf('Safari') >= 0)
+else if (exports.core.userAgent.indexOf('Safari/') !== -1)
 	exports.core.browser = "Safari"
-else if (exports.core.userAgent.indexOf('MSIE') >= 0)
+else if (exports.core.userAgent.indexOf('MSIE ') !== -1 || exports.core.userAgent.indexOf('Trident') !== -1)
 	exports.core.browser = "IE"
-else if (exports.core.userAgent.indexOf('YaBrowser') >= 0)
+else if (exports.core.userAgent.indexOf('YaBrowser') !== -1)
 	exports.core.browser = "Yandex"
 else
 	exports.core.browser = ''
