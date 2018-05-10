@@ -9,6 +9,7 @@ Object {
 	property real radius;					///< round corner radius
 	property real scale: 1;
 	property bool fixed;
+	property bool mouseEnabled: true;
 
 	property bool focus;					///< this item can be focused
 	property bool focused; ///< this item is focused among its siblings
@@ -241,6 +242,7 @@ Object {
 	onClipChanged:		{ this.style('overflow', value? 'hidden': 'visible') }
 	onFixedChanged:		{ this.style('position', value ? 'fixed' :  'absolute') }
 	onClassChanged:		{ this.element.dom.setAttribute('class', value) }
+	onMouseEnabledChanged: { this.style('pointer-events', value ? "auto" : "none");}
 
 	///@private sets current global focus to component
 	function forceActiveFocus() {
