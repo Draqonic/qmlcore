@@ -11,21 +11,20 @@ Object {
 	}
 
 	/// restart timer, activate if stopped
-	restart: { this._restart(); this.running = true; }
+	restart: { this.stop(); this.start(); }
 
 	/// stops timer
-	stop: { this.running = false; }
+	stop: { this.running = false }
 
 	/// starts timer
-	start: {
-		var oldRunning = this.running;
-		this.running = true;
-		if (this.triggeredOnStart && !oldRunning)
-			this.triggered();
-	}
+	start: { this.running = true }
 
 	/// @private
-	onTriggered: { if (!this.repeat) this.running = false }
+	onTriggered: {
+		if (!this.repeat && (!this.triggeredOnStart || this._triggered))
+			this.running = false
+		this._triggered = true
+	}
 
 	/// @private
 	onCompleted: {
@@ -33,14 +32,16 @@ Object {
 			this.triggered()
 	}
 
-	onRunningChanged:	{
+	onRunningChanged: {
 		this._restart()
-		if (value && this.triggeredOnStart)
+		if (value && this.triggeredOnStart) {
+			this._triggered = false
 			this.triggered()
+		}
 	}
 
-	onIntervalChanged:	{ this._restart() }
-	onRepeatChanged: 	{ this._restart() }
+	onIntervalChanged,
+	onRepeatChanged: { this._restart() }
 
 	/// @private
 	function _restart() {
