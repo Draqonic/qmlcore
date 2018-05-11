@@ -242,7 +242,7 @@ Object {
 	onClipChanged:		{ this.style('overflow', value? 'hidden': 'visible') }
 	onFixedChanged:		{ this.style('position', value ? 'fixed' :  'absolute') }
 	onClassChanged:		{ this.element.dom.setAttribute('class', value) }
-	onMouseEnabledChanged: { this.style('pointer-events', value ? "auto" : "none");}
+	onMouseEnabledChanged: { this.style('pointer-events', value ? 'auto' : 'none') }
  	onItemStyleChanged: { this.itemStyleUpdate() }
  	
  	function itemStyleUpdate() {

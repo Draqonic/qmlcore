@@ -34,8 +34,6 @@ BaseLayout {
 
 	/// @private focuses current item
 	function focusCurrent() {
-		if (!this.nativeScrolling) // TODO: temp fix
-			return
 		var n = this.count
 		if (n == 0)
 			return
