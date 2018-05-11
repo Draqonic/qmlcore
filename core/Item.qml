@@ -29,6 +29,7 @@ Object {
 	property bool cssTranslatePositioning;
 	property bool cssNullTranslate3D;
 	property bool cssDelegateAlwaysVisibleOnAcceleratedSurfaces: true;
+	property var itemStyle;
 
 	property const left: 	{ return [this, 0]; }
 	property const top: 	{ return [this, 1]; }
@@ -44,7 +45,6 @@ Object {
 	property int viewY;						///< y position in view (if any)
 
 	property int keyProcessDelay;			///< delay time between key pressed events
-
 	property bool absoluteEnabled;
 	property int absoluteX: -1;
 	property int absoluteY: -1;
@@ -243,6 +243,11 @@ Object {
 	onFixedChanged:		{ this.style('position', value ? 'fixed' :  'absolute') }
 	onClassChanged:		{ this.element.dom.setAttribute('class', value) }
 	onMouseEnabledChanged: { this.style('pointer-events', value ? "auto" : "none");}
+ 	onItemStyleChanged: { this.itemStyleUpdate() }
+ 	
+ 	function itemStyleUpdate() {
+ 		this.itemStyle._getStyle(this)
+ 	}
 
 	///@private sets current global focus to component
 	function forceActiveFocus() {
