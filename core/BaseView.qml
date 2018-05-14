@@ -235,6 +235,17 @@ BaseLayout {
 	onHeightChanged:			{ this._scheduleLayout() }
 
 	onModelChanged: {
+		var intModel = parseInt(this.model)
+		if (intModel >= 0) {
+			var count = intModel
+			this.model = new _globals.core.ListModel(this)
+			var array = []
+			for (var i = 0; i !== count; ++i)
+				array.push({})
+			this.model.append(array)
+			return
+		}
+
 		if (value)
 		{
 			var $this = this
