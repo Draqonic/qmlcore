@@ -263,7 +263,9 @@ var Color = exports.core.Color = function(value) {
 		return
 	}
 	var triplet
-	if (value.substring(0, 4) == "rgba") {
+	if (value[0] === '#') {
+		triplet = value.substring(1)
+	} else if (value.substring(0, 4) === "rgba") {
 		var b = value.indexOf('('), e = value.lastIndexOf(')')
 		value = value.substring(b + 1, e).split(',')
 		this.r = parseInt(value[0], 10)
@@ -271,41 +273,60 @@ var Color = exports.core.Color = function(value) {
 		this.b = parseInt(value[2], 10)
 		this.a = Math.floor(parseFloat(value[3]) * 255)
 		return
-	}
-	else {
-		var h = value[0]
-		if (h != '#')
-			triplet = colorTable[value]
-		else
-			triplet = value.substring(1)
-	}
+	} else
+		triplet = colorTable[value]
 
 	if (!triplet) {
-		this.r = 255
+		this.r = this.b = this.a = 255
 		this.g = 0
-		this.b = 255
-		log("invalid color specification: " + value)
+		log("invalid color specification: " + value, new Error().stack)
 		return
 	}
 
 	var len = triplet.length;
-	if (len == 3 || len == 4) {
+	if (len === 3 || len === 4) {
 		var r = parseInt(triplet[0], 16)
 		var g = parseInt(triplet[1], 16)
 		var b = parseInt(triplet[2], 16)
-		var a = (len == 4)? parseInt(triplet[3], 16): 15
+		var a = (len === 4)? parseInt(triplet[3], 16): 15
 		this.r = (r << 4) | r;
 		this.g = (g << 4) | g;
 		this.b = (b << 4) | b;
 		this.a = (a << 4) | a;
-	} else if (len == 6 || len == 8) {
+	} else if (len === 6 || len === 8) {
 		this.r = parseInt(triplet.substring(0, 2), 16)
 		this.g = parseInt(triplet.substring(2, 4), 16)
 		this.b = parseInt(triplet.substring(4, 6), 16)
-		this.a = (len == 8)? parseInt(triplet.substring(6, 8), 16): 255
+		this.a = (len === 8)? parseInt(triplet.substring(6, 8), 16): 255
 	} else
 		throw new Error("invalid color specification: " + value)
 }
+
+Color.interpolate = function(dst, src, t) {
+	if (!(dst instanceof Color))
+		dst = new Color(dst)
+	if (!(src instanceof Color))
+		src = new Color(src)
+
+	var interpolate = function (dst, src, t) {
+		return Math.floor(t * (dst - src) + src)
+	}
+
+	var r = interpolate(dst.r, src.r, t)
+	var g = interpolate(dst.g, src.g, t)
+	var b = interpolate(dst.b, src.b, t)
+	var a = interpolate(dst.a, src.a, t)
+
+	return new Color([r, g, b, a])
+}
+
+Color.normalize = function(spec) {
+	if (spec instanceof Color)
+		return spec.rgba()
+	else
+		return (new Color(spec)).rgba()
+}
+
 var ColorPrototype = Color.prototype
 ColorPrototype.constructor = exports.core.Color
 /** @const */
@@ -328,20 +349,6 @@ ColorPrototype.hex = function() {
 
 ColorPrototype.ahex = function() {
 	return '#' + hexByte(this.a) + hexByte(this.r) + hexByte(this.g) + hexByte(this.b)
-}
-
-exports.core.normalizeColor = function(spec) {
-	if (spec instanceof Color)
-		return spec.rgba()
-	else
-		return (new Color(spec)).rgba()
-}
-
-exports.core.mixColor = function(specA, specB, r) {
-	var a = new Color(specA)
-	var b = new Color(specB)
-	var mix = function(a, b, r) { return Math.floor((b - a) * r + a) }
-	return [mix(a.r, b.r, r), mix(a.g, b.g, r), mix(a.b, b.b, r), mix(a.a, b.a, r)]
 }
 
 exports.addLazyProperty = function(proto, name, creator) {

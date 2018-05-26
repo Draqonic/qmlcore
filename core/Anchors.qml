@@ -22,6 +22,16 @@ Object {
 	constructor : {
 		this._items = []
 		this._scheduleUpdate = function() { this._context.delayedAction('update-anchors', this, this._updateAll) }.bind(this)
+		this._grabX = false
+		this._grabY = false
+	}
+
+	function _grab(item, prop) {
+		if (prop === 'x')
+			this._grabX = true
+		if (prop === 'y')
+			this._grabY = true
+		item._removeUpdater(prop)
 	}
 
 	/** @private */
@@ -78,7 +88,8 @@ Object {
 		} else if (hcenterAnchor) {
 			hcenter = toScreen(hcenterAnchor)
 			item.x = hcenter - (item.width + lm - rm) / 2 - parentX - item.viewX
-		}
+		} else if (this._grabX)
+			item.x = lm
 
 		if (topAnchor && bottomAnchor) {
 			top = toScreen(topAnchor)
@@ -104,7 +115,8 @@ Object {
 		} else if (vcenterAnchor) {
 			vcenter = toScreen(vcenterAnchor)
 			item.y = vcenter - (item.height + tm - bm) / 2 - parentY - item.viewY
-		}
+		} else if (this._grabY)
+			item.y = tm
 	}
 
 	/** @private */
@@ -118,96 +130,120 @@ Object {
 	}
 
 	onLeftChanged: {
+		this._scheduleUpdate()
+		if (value === null)
+			return
+
 		var item = this.parent
 		var anchors = this
-		item._removeUpdater('x')
+		this._grab(item, 'x')
 		if (anchors.right || anchors.horizontalCenter) {
-			item._removeUpdater('width')
+			this._grab(item, 'width')
 			this._subscribe(item)
 		}
 		this._subscribe(value[0])
-		this._scheduleUpdate()
 	}
 
 	onRightChanged: {
+		this._scheduleUpdate()
+		if (value === null)
+			return
+
 		var item = this.parent
 		var anchors = this
-		item._removeUpdater('x')
+		this._grab(item, 'x')
 		if (anchors.left || anchors.horizontalCenter) {
-			anchors._removeUpdater('width')
+			this._grab(item, 'width')
 		}
 		this._subscribe(item)
 		this._subscribe(value[0])
-		this._scheduleUpdate()
 	}
 
 	onHorizontalCenterChanged: {
+		this._scheduleUpdate()
+		if (value === null)
+			return
+
 		var item = this.parent
 		var anchors = this
-		item._removeUpdater('x')
+		this._grab(item, 'x')
 		if (anchors.left || anchors.right) {
-			anchors._removeUpdater('width')
+			this._grab(item, 'width')
 		}
 		this._subscribe(item)
 		this._subscribe(value[0])
-		this._scheduleUpdate()
-
 	}
+
 	onTopChanged: {
+		this._scheduleUpdate()
+		if (value === null)
+			return
+
 		var item = this.parent
 		var anchors = this
-		item._removeUpdater('y')
+		this._grab(item, 'y')
 		if (anchors.bottom || anchors.verticalCenter) {
-			item._removeUpdater('height')
+			this._grab(item, 'height')
 			this._subscribe(item)
 		}
 		this._subscribe(value[0])
-		this._scheduleUpdate()
-
 	}
+
 	onBottomChanged: {
+		this._scheduleUpdate()
+		if (value === null)
+			return
+
 		var item = this.parent
 		var anchors = this
-		item._removeUpdater('y')
+		this._grab(item, 'y')
 		if (anchors.top || anchors.verticalCenter) {
-			item._removeUpdater('height')
+			this._grab(item, 'height')
 		}
 		this._subscribe(item)
 		this._subscribe(value[0])
-		this._scheduleUpdate()
 	}
 
 	onVerticalCenterChanged: {
+		this._scheduleUpdate()
+		if (value === null)
+			return
+
 		var item = this.parent
 		var anchors = this
-		item._removeUpdater('y')
+		this._grab(item, 'y')
 		if (anchors.top || anchors.bottom) {
-			item._removeUpdater('height')
+			this._grab(item, 'height')
 		}
 		this._subscribe(item)
 		this._subscribe(value[0])
-		this._scheduleUpdate()
 	}
 
 	onFillChanged: {
+		this._scheduleUpdate()
+		if (value === null)
+			return
+
 		var item = this.parent
 		var anchors = this
-		item._removeUpdater('x')
-		item._removeUpdater('width')
-		item._removeUpdater('y')
-		item._removeUpdater('height')
+		this._grab(item, 'x')
+		this._grab(item, 'width')
+		this._grab(item, 'y')
+		this._grab(item, 'height')
 		this._subscribe(value)
-		this._scheduleUpdate()
 	}
 
 	onCenterInChanged: {
+		this._scheduleUpdate()
+		if (value === null)
+			return
+
 		var item = this.parent
 		var anchors = this
-		item._removeUpdater('x')
-		item._removeUpdater('y')
+		this._grab(item, 'x')
+		this._grab(item, 'y')
 		this._subscribe(value)
 		this._subscribe(item)
-		this._scheduleUpdate()
 	}
 
 	onLeftMarginChanged,

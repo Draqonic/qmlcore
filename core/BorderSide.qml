@@ -28,7 +28,7 @@ Object {
  		case Border.Outset: styleName = 'outset'; break
  		}
 
-		var borderCss = this.width + "px " + styleName + " " + _globals.core.normalizeColor(this.color)
+		var borderCss = this.width + "px " + styleName + " " + _globals.core.Color.normalize(this.color)
 		this.parent.parent.style('border-' + this.name, borderCss)
 	}
 

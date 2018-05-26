@@ -19,7 +19,7 @@ Object {
 	onWidthChanged: { this.parent.style({'border-width': value}) }
 	onColorChanged,
 	onOpacityChanged: {
-		var newColor = _globals.core.normalizeColor(this.color)
+		var newColor = _globals.core.Color.normalize(this.color)
 		newColor = newColor.slice(0, -2) + this.opacity + ")"
 		this.parent.style('border-color', newColor)
 	}
