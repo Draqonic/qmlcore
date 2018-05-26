@@ -95,6 +95,22 @@ describe('ModelUpdate', function() {
 		})
 	})
 
+	describe('stray update', function() {
+		it('should call update', function() {
+			model = new Model()
+			view = new View()
+
+			model.reset(5)
+			model.apply(view)
+
+			sinon.spy(view, '_updateItems')
+			model.update(0, 1)
+			model.apply(view)
+			sinon.assert.calledOnce(view._updateItems)
+			sinon.assert.calledWith(view._updateItems, 0, 1)
+		})
+	})
+
 	describe('sequental left update', function() {
 		it('should set three ranges, noop, update, noop', function() {
 			model = new Model()
@@ -230,6 +246,34 @@ describe('ModelUpdate', function() {
 			sinon.assert.calledOnce(view._insertItems)
 			sinon.assert.calledOnce(view._updateItems)
 			sinon.assert.calledOnce(view._removeItems)
+		})
+	})
+
+	describe('reset model, then update', function() {
+		it('should call insert, update, and remove', function() {
+			model = new Model()
+			view = new View()
+
+			var insert = sinon.spy(view, '_insertItems')
+			var update = sinon.spy(view, '_updateItems')
+			var remove = sinon.spy(view, '_removeItems')
+
+			model.reset(20)
+			model.apply(view)
+
+			sinon.assert.calledWith(view._insertItems, 0, 20)
+			sinon.assert.callCount(view._updateItems, 0)
+			sinon.assert.callCount(view._removeItems, 0)
+
+			model.reset(20)
+			model.update(0, 1)
+			model.apply(view)
+
+			sinon.assert.calledWith(view._insertItems, 0, 20)
+			sinon.assert.callCount(view._insertItems, 1)
+			sinon.assert.calledWith(view._updateItems, 0, 20)
+			sinon.assert.callCount(view._updateItems, 1)
+			sinon.assert.callCount(view._removeItems, 0)
 		})
 	})
 
