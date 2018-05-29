@@ -1,7 +1,7 @@
 ///base class for all views, holds content, creates delegates and provides common api
 BaseLayout {
 	signal layoutFinished;
-	property Object model;			///< model object to attach to
+	property Object model: ListModel {}			///< model object to attach to
 	property Item delegate;			///< delegate - template object, filled with model row
 	property int contentX;			///< x offset to visible part of the content surface
 	property int contentY;			///< y offset to visible part of the content surface
@@ -78,6 +78,20 @@ BaseLayout {
 	}
 
 	onModelChanged: {
+		var intModel = parseInt(value)
+		var arrModel = Array.isArray(value)
+
+		if (intModel >= 0 || arrModel) {
+			var count = arrModel ? value.length : intModel
+			this.model = new _globals.core.ListModel()
+
+			var array = []
+			for (var i = 0; i !== count; ++i)
+				array.push(arrModel ? {"modelData": value[i]} : {})
+			this.model.append(array)
+			return
+		}
+
 		if (this.trace)
 			log('model changed to ', value)
 

@@ -1,3 +1,0 @@
-///Compatible with Qt
-Object {
-}

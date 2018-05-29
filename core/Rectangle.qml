@@ -5,7 +5,7 @@ Item {
 	property Gradient gradient;			///< if gradient object was set, it displays gradient instead of solid color
 	constructor : {
 		this._context.backend.initRectangle(this)
-		this.style('background-color', _globals.core.normalizeColor(this.color))
+		this.style('background-color', _globals.core.Color.normalize(this.color))
 	}
 	
 	function toString() {

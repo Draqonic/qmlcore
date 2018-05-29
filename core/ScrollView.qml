@@ -26,12 +26,20 @@ Item {
 		this.element.dom.onscroll = context.wrapNativeCallback(this._updateScrollProperties.bind(this))
 	}
 
-	/// scroll
+	/// smooth scroll
 	function scroll(x, y) {
 		this.element.dom.scroll({
 			left: x,
 	      		top: y,
 	      		behavior: 'smooth' 
+		})
+	}
+
+	/// scroll
+	function quickScroll(x, y) {
+		this.element.dom.scroll({
+			left: x,
+	      		top: y
 		})
 	}
 
