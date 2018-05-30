@@ -133,10 +133,6 @@ Object {
 		this._scheduleUpdate()
 		if (value === null)
 			return
-		if (value.left !== undefined) {
-			this.left = this.left.left
-			return
-		}
 
 		var item = this.parent
 		var anchors = this
@@ -152,10 +148,6 @@ Object {
 		this._scheduleUpdate()
 		if (value === null)
 			return
-		if (value.right !== undefined) {
-			this.right = this.right.right
-			return
-		}
 
 		var item = this.parent
 		var anchors = this
@@ -171,10 +163,6 @@ Object {
 		this._scheduleUpdate()
 		if (value === null)
 			return
-		if (value.horizontalCenter !== undefined) {
-			this.horizontalCenter = this.horizontalCenter.horizontalCenter
-			return
-		}
 
 		var item = this.parent
 		var anchors = this
@@ -190,10 +178,6 @@ Object {
 		this._scheduleUpdate()
 		if (value === null)
 			return
-		if (value.top !== undefined) {
-			this.top = this.top.top
-			return
-		}
 
 		var item = this.parent
 		var anchors = this
@@ -209,10 +193,6 @@ Object {
 		this._scheduleUpdate()
 		if (value === null)
 			return
-		if (value.bottom !== undefined) {
-			this.bottom = this.bottom.bottom
-			return
-		}
 
 		var item = this.parent
 		var anchors = this
@@ -228,10 +208,6 @@ Object {
 		this._scheduleUpdate()
 		if (value === null)
 			return
-		if (value.verticalCenter !== undefined) {
-			this.verticalCenter = this.verticalCenter.verticalCenter
-			return
-		}
 
 		var item = this.parent
 		var anchors = this
