@@ -237,3 +237,6 @@ exports.ModelUpdate.prototype.apply = function(view, skipCheck) {
 
 var ArrayModelWrapper = exports.ArrayModelWrapper = function (data) { this.data = data; this.count = data.length }
 ArrayModelWrapper.prototype.get = function(idx)  { return { value: this.data[idx] } }
+
+var NumberModelWrapper = exports.NumberModelWrapper = function (data) { this.data = data; this.count = data }
+NumberModelWrapper.prototype.get = function(idx)  { return { value: idx } }

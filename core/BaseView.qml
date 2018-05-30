@@ -78,20 +78,6 @@ BaseLayout {
 	}
 
 	onModelChanged: {
-		var intModel = parseInt(value)
-		var arrModel = Array.isArray(value)
-
-		if (intModel >= 0 || arrModel) {
-			var count = arrModel ? value.length : intModel
-			this.model = new _globals.core.ListModel()
-
-			var array = []
-			for (var i = 0; i !== count; ++i)
-				array.push(arrModel ? {"modelData": value[i]} : {})
-			this.model.append(array)
-			return
-		}
-
 		if (this.trace)
 			log('model changed to ', value)
 
@@ -155,6 +141,8 @@ BaseLayout {
 			model.on('rowsRemoved', this._modelRowsRemoved)
 		} else if (Array.isArray(model)) {
 			model = new _globals.core.model.ArrayModelWrapper(model)
+		} else if (parseInt(model) > 0) {
+			model = new _globals.core.model.NumberModelWrapper(model)
 		} else
 			throw new Error("unknown value attached to model property")
 
@@ -173,10 +161,12 @@ BaseLayout {
 
 		this._attached = null
 
-		model.removeListener('reset', this._modelReset)
-		model.removeListener('rowsInserted', this._modelRowsInserted)
-		model.removeListener('rowsChanged', this._modelRowsChanged)
-		model.removeListener('rowsRemoved', this._modelRowsRemoved)
+		if (model instanceof _globals.core.ListModel) {
+			model.removeListener('reset', this._modelReset)
+			model.removeListener('rowsInserted', this._modelRowsInserted)
+			model.removeListener('rowsChanged', this._modelRowsChanged)
+			model.removeListener('rowsRemoved', this._modelRowsRemoved)
+		}
 	}
 
 	onDelegateChanged: {
