@@ -135,15 +135,15 @@ BaseLayout {
 
 		var ListModel = _globals.core.ListModel
 		var model = this.model
-		if ((ListModel !== undefined) && (model instanceof ListModel)) {
-		} else if (Array.isArray(model)) {
+
+		if (Array.isArray(model)) {
 			for(var i = 0; i !== model.length; ++i)
 				if (model[i] === undefined)
 					model.splice(i, 1)
 			model = new _globals.core.model.ArrayModelWrapper(model)
 		} else if (parseInt(model) > 0) {
 			model = new _globals.core.model.NumberModelWrapper(model)
-		} else
+		} else if (!(ListModel !== undefined && model instanceof ListModel))
 			throw new Error("unknown value attached to model property")
 
 		model.on('reset', this._modelReset)
@@ -166,12 +166,10 @@ BaseLayout {
 
 		this._attached = null
 
-		if (model instanceof _globals.core.ListModel) {
-			model.removeListener('reset', this._modelReset)
-			model.removeListener('rowsInserted', this._modelRowsInserted)
-			model.removeListener('rowsChanged', this._modelRowsChanged)
-			model.removeListener('rowsRemoved', this._modelRowsRemoved)
-		}
+		model.removeListener('reset', this._modelReset)
+		model.removeListener('rowsInserted', this._modelRowsInserted)
+		model.removeListener('rowsChanged', this._modelRowsChanged)
+		model.removeListener('rowsRemoved', this._modelRowsRemoved)
 	}
 
 	onDelegateChanged: {

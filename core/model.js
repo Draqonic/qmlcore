@@ -240,7 +240,7 @@ ArrayModelWrapper.prototype.get = function(idx)  { return { value: this.data[idx
 ArrayModelWrapper.prototype.on = function() { }
 ArrayModelWrapper.prototype.removeListener = function() { }
 
-var NumberModelWrapper = exports.NumberModelWrapper = function (data) { this.data = data; this.count = data }
+var NumberModelWrapper = exports.NumberModelWrapper = function (data) { this.count = data }
 NumberModelWrapper.prototype.get = function(idx)  { return { value: idx } }
 NumberModelWrapper.prototype.on = function() { }
 NumberModelWrapper.prototype.removeListener = function() { }
