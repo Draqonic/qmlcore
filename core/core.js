@@ -777,3 +777,5 @@ String.prototype.arg = function (arg) {
 	log("string.arg: Argument missing: '%1', arg: '%2'".arg(this).arg(arg))
 	return this;
 };
+
+Array.prototype.__defineGetter__("count", function() { return this.length })

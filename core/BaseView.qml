@@ -140,6 +140,9 @@ BaseLayout {
 			model.on('rowsChanged', this._modelRowsChanged)
 			model.on('rowsRemoved', this._modelRowsRemoved)
 		} else if (Array.isArray(model)) {
+			for(var i = 0; i !== model.length; ++i)
+				if (model[i] === undefined)
+					model.splice(i, 1)
 			model = new _globals.core.model.ArrayModelWrapper(model)
 		} else if (parseInt(model) > 0) {
 			model = new _globals.core.model.NumberModelWrapper(model)
