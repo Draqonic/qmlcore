@@ -133,18 +133,20 @@ BaseLayout {
 		if (this.trace)
 			log('attaching model...')
 
-		var ListModel = _globals.core.ListModel
+		var Model = _globals.core.Model
 		var model = this.model
 
-		if (Array.isArray(model)) {
+		if ((Model !== undefined) && (model instanceof Model)) {
+		} else if (Array.isArray(model)) {
+			// TODO: array bug hack
 			for(var i = 0; i !== model.length; ++i)
 				if (model[i] === undefined)
 					model.splice(i, 1)
 			model = new _globals.core.model.ArrayModelWrapper(model)
 		} else if (parseInt(model) > 0) {
 			model = new _globals.core.model.NumberModelWrapper(model)
-		} else if (!(ListModel !== undefined && model instanceof ListModel))
-			throw new Error("unknown value attached to model property")
+		} else
+			throw new Error("unknown value of type " + (typeof model) + ", attached to model property: " + model + ('componentName' in model? ', component name: ' + model.componentName: ''))
 
 		model.on('reset', this._modelReset)
 		model.on('rowsInserted', this._modelRowsInserted)
