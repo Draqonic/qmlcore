@@ -15,6 +15,7 @@ Object {
 			this._mpmPressBinder = new _globals.core.EventBinder(this.element)
 			this._mpmPressBinder.on('mousedown',	function() { this.pressed = true }.bind(this))
 			this._mpmPressBinder.on('mouseup',		function() { this.pressed = false }.bind(this))
+			this._mpmPressBinder.on('mouseleave',	function() { this.pressed = false }.bind(this))
 		}
 		if (this._mpmPressBinder)
 			this._mpmPressBinder.enable(value)
