@@ -40,7 +40,7 @@ Object {
 	property const verticalCenter:		{ return [this, 5]; }
 
 	//do not use, view internal
-	signal boxChanged;						///< emitted when position or size changed
+	signal newBoundingBox;						///< emitted when position or size changed
 	property int viewX;						///< x position in view (if any)
 	property int viewY;						///< y position in view (if any)
 
@@ -54,6 +54,8 @@ Object {
 	constructor: {
 		this._pressedHandlers = {}
 		this._topPadding = 0
+		this._borderXAdjust = 0
+		this._borderYAdjust = 0
 		if (parent) {
 			if (this.element)
 				throw new Error('double ctor call')
@@ -175,6 +177,14 @@ Object {
 		child.recursiveVisible = value && child.visible && child.visibleInView
 	}
 
+	///@private
+	function _setSizeAdjust() {
+		var x = this.x + this.viewX + this._borderXAdjust
+		var y = this.y + this.viewY + this._borderYAdjust
+		this.style('left', x)
+		this.style('top', y)
+	}
+
 	onRecursiveVisibleChanged: {
 		var children = this.children
 		for(var i = 0, n = children.length; i < n; ++i) {
@@ -196,8 +206,8 @@ Object {
 		onTriggered: { this.parent._updateAbsoluteCoords() }
 	}
 
-	onWidthChanged: 	{ this.style('width', value); this.boxChanged()}
-	onHeightChanged:	{ this.style('height', value - this._topPadding); this.boxChanged() }
+	onWidthChanged: 	{ this.style('width', value); this.newBoundingBox()}
+	onHeightChanged:	{ this.style('height', value - this._topPadding); this.newBoundingBox() }
 
 	onXChanged,
 	onViewXChanged: {
@@ -206,7 +216,7 @@ Object {
 			this.transform.translateX = x
 		else
 			this.style('left', x)
-		this.boxChanged()
+		this.newBoundingBox()
 		if (hack && this.absoluteEnabled)
 			hack.start()
 	}
@@ -218,6 +228,7 @@ Object {
 		this.absoluteX = absolute.x + window.pageXOffset
 		this.absoluteY = absolute.y + window.pageYOffset
 		context._updateContentScroll()
+		this.newBoundingBox()
 	}
 
 	onYChanged,
@@ -227,7 +238,7 @@ Object {
 			this.transform.translateY = y
 		else
 			this.style('top', y)
-		this.boxChanged()
+		this.newBoundingBox()
 		if (hack && this.absoluteEnabled)
 			hack.start()
 	}

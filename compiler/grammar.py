@@ -1,6 +1,7 @@
 from pyparsing import *
 import lang
 import re
+import json
 
 ParserElement.setDefaultWhitespaceChars(" \t\r\f")
 ParserElement.enablePackrat()
@@ -114,6 +115,9 @@ def handle_documentation_string(s, l, t):
 	elif text.startswith('/**'):
 		end = text.rfind('*/')
 		document(text[3:end], l, False)
+		
+def handle_json_array(s, l, tokens):
+	return [list(tokens)]
 
 def handle_json_object(s, l, tokens):
 	obj = {}
@@ -271,6 +275,7 @@ json_value = Forward()
 json_object = Suppress("{") + delimitedList(Group((unquoted_string_value | identifier) + Suppress(":") + json_value) | empty, Suppress(";") | Suppress(",")) + Suppress('}')
 json_object.setParseAction(handle_json_object)
 json_array = Suppress("[") + delimitedList(json_value) + Suppress("]")
+json_array.setParseAction(handle_json_array)
 json_value << (null_value | bool_value | number | unquoted_string_value | json_array | json_object)
 
 list_element_declaration = Keyword("ListElement").suppress() - json_object
@@ -302,9 +307,9 @@ def handle_percent_number(s, l, t):
 percent_number = number + '%'
 percent_number.setParseAction(handle_percent_number)
 
-expression_array = Literal("[") + Optional(delimitedList(expression, ",")) + Literal("]")
+expression_array = Literal("[") + Optional(delimitedList(json_value, ",")) + Literal("]")
 def handle_expression_array(s, l, t):
-	return ",".join(t)
+	json.dumps(list(t))
 
 expression_array.setParseAction(handle_expression_array)
 

@@ -239,8 +239,3 @@ var ArrayModelWrapper = exports.ArrayModelWrapper = function (data) { this.data 
 ArrayModelWrapper.prototype.get = function(idx)  { return { value: this.data[idx] } }
 ArrayModelWrapper.prototype.on = function() { }
 ArrayModelWrapper.prototype.removeListener = function() { }
-
-var NumberModelWrapper = exports.NumberModelWrapper = function (data) { this.count = data }
-NumberModelWrapper.prototype.get = function(idx)  { return { value: idx } }
-NumberModelWrapper.prototype.on = function() { }
-NumberModelWrapper.prototype.removeListener = function() { }
