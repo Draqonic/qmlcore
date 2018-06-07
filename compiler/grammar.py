@@ -307,9 +307,9 @@ def handle_percent_number(s, l, t):
 percent_number = number + '%'
 percent_number.setParseAction(handle_percent_number)
 
-expression_array = Literal("[") + Optional(delimitedList(json_value, ",")) + Literal("]")
+expression_array = Suppress("[") + Optional(delimitedList(json_value, ",")) + Suppress("]")
 def handle_expression_array(s, l, t):
-	json.dumps(list(t))
+	return json.dumps(list(t))
 
 expression_array.setParseAction(handle_expression_array)
 
