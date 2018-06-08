@@ -56,6 +56,8 @@ Object {
 		this._topPadding = 0
 		this._borderXAdjust = 0
 		this._borderYAdjust = 0
+		this._borderWidthAdjust = 0
+		this._borderHeightAdjust = 0
 		if (parent) {
 			if (this.element)
 				throw new Error('double ctor call')
@@ -181,8 +183,14 @@ Object {
 	function _setSizeAdjust() {
 		var x = this.x + this.viewX + this._borderXAdjust
 		var y = this.y + this.viewY + this._borderYAdjust
-		this.style('left', x)
-		this.style('top', y)
+
+		if (this.cssTranslatePositioning && !$manifest$cssDisableTransformations) {
+			this.transform.translateX = x
+			this.transform.translateY = y
+		} else {
+			this.style('left', x)
+			this.style('top', y)
+		}
 	}
 
 	onRecursiveVisibleChanged: {
@@ -199,15 +207,8 @@ Object {
 	onVisibleChanged:		{ this._updateVisibility() }
 	onVisibleInViewChanged:	{ this._updateVisibility() }
 
-	Timer {
-		id: hack;
-		interval: 100;
-		running: true;
-		onTriggered: { this.parent._updateAbsoluteCoords() }
-	}
-
-	onWidthChanged: 	{ this.style('width', value); this.newBoundingBox()}
-	onHeightChanged:	{ this.style('height', value - this._topPadding); this.newBoundingBox() }
+	onWidthChanged: 	{ this.style('width', value + this._borderWidthAdjust); this.newBoundingBox() }
+	onHeightChanged:	{ this.style('height', value - this._topPadding + this._borderHeightAdjust); this.newBoundingBox() }
 
 	onXChanged,
 	onViewXChanged: {
@@ -435,4 +436,11 @@ Object {
 
 	/// focus this item
 	setFocus:		{ this.forceActiveFocus() }
+	
+	Timer {
+		id: hack;
+		interval: 100;
+		running: true;
+		onTriggered: { this.parent._updateAbsoluteCoords() }
+	}
 }
