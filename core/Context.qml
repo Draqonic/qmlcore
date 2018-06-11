@@ -133,6 +133,7 @@ Item {
 
 	///@private
 	function init() {
+		this.__init()
 		this.backend.initSystem(this.system)
 	}
 
@@ -150,11 +151,8 @@ Item {
 
 	///@private
 	function start(instance) {
-		var c = {}
 		this.children.push(instance)
-		instance.$c(c)
-		instance.$s(c)
-		c = undefined
+		instance.__init()
 		log('Context: created instance')
 		// log('Context: calling on completed')
 		return instance;
