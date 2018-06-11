@@ -779,5 +779,3 @@ String.prototype.arg = function (arg) {
 };
 
 Array.prototype.__defineGetter__("count", function() { return this.length })
-Number.prototype.__defineGetter__("count", function() { return this })
-
