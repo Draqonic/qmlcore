@@ -221,7 +221,7 @@ Object {
 		if (hack && this.absoluteEnabled)
 			hack.start()
 	}
-	
+
 	function _updateAbsoluteCoords() {
 		if (!context)
 			return
@@ -436,7 +436,7 @@ Object {
 
 	/// focus this item
 	setFocus:		{ this.forceActiveFocus() }
-	
+
 	Timer {
 		id: hack;
 		interval: 100;
