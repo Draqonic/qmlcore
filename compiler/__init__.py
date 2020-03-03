@@ -1,5 +1,10 @@
+from __future__ import print_function
+from future import standard_library
+from future.utils import PY2
+standard_library.install_aliases()
+from builtins import object, str
+
 import compiler.doc.json
-import compiler.pyparsing
 import compiler.grammar
 import compiler.manifest
 from compiler.manifest import merge_properties
@@ -7,20 +12,17 @@ import compiler.js
 import compiler.lang
 import os, os.path
 import hashlib
-import cPickle
+import pickle
 import json
 from multiprocessing import Pool, cpu_count
 import sys
-
-compiler.grammar.source.parseWithTabs()
 
 try:
 	import inspect
 	data = ""
 	data += inspect.getsource(compiler.grammar)
 	data += inspect.getsource(compiler.lang)
-	data += inspect.getsource(compiler.pyparsing)
-	grammar_digest = hashlib.sha1(data).hexdigest()
+	grammar_digest = hashlib.sha1(data.encode('utf-8')).hexdigest()
 	del data
 except:
 	grammar_digest = '0000000000000000000000000000000000000000'
@@ -36,29 +38,30 @@ class Cache(object):
 	def read(self, name, hashkey):
 		cached_path = os.path.join(self.dir, name)
 		try:
-			with open(cached_path) as f:
-				if f.readline().strip() != hashkey:
+			with open(cached_path, 'rb') as f:
+				cached_hashkey = f.readline().strip().decode('utf-8')
+				if cached_hashkey != hashkey:
 					raise Exception("invalid hash")
-				return cPickle.load(f)
+				return pickle.load(f)
 		except:
 			return
 
 	def write(self, name, hashkey, data):
 		cached_path = os.path.join(self.dir, name)
-		with open(cached_path, "w") as f:
-			f.write(hashkey + "\n")
-			cPickle.dump(data, f)
+		with open(cached_path, "wb") as f:
+			f.write((hashkey + "\n").encode('utf-8'))
+			pickle.dump(data, f)
 
 def parse_qml_file(cache, com, path):
 	with open(path) as f:
 		data = f.read()
-		h = hashlib.sha1(grammar_digest + data).hexdigest()
+		h = hashlib.sha1((grammar_digest + data).encode('utf-8')).hexdigest()
 
 	cached = cache.read(com, h)
 	if cached:
 		return cached, data
 	else:
-		print "parsing", path, "...", com
+		print("parsing", path, "...", com, file=sys.stderr)
 		try:
 			tree = compiler.grammar.parse(data)
 			cache.write(com, h, tree)
@@ -78,7 +81,7 @@ class Compiler(object):
 		if ext == ".qml":
 			if name[0].islower():
 				if self.app != name:
-					#print "skipping", name
+					#print("skipping", name, file=sys.stderr)
 					return
 
 			if pool is not None:
@@ -90,7 +93,7 @@ class Compiler(object):
 			with open(path) as f:
 				data = f.read()
 			if self.verbose:
-				print "including js file...", path
+				print("including js file...", path, file=sys.stderr)
 			generator.add_js(com, data)
 		elif ext == '.ts':
 			generator.add_ts(path)
@@ -114,7 +117,7 @@ class Compiler(object):
 				package_name = str(root_manifest.package)
 
 			for dirpath, dirnames, filenames in os.walk(project_dir, topdown = True):
-				dirnames[:] = filter(lambda name: not name[:6].startswith("build.") and name != "dist", dirnames)
+				dirnames[:] = [name for name in dirnames if not name[:6].startswith("build.") and name != "dist"]
 				if '.nocompile' in filenames:
 					dirnames[:] = []
 					continue
@@ -122,14 +125,20 @@ class Compiler(object):
 				if '.manifest' in filenames:
 					with open(os.path.join(dirpath, '.manifest')) as f:
 						manifest = compiler.manifest.load(f)
-						if manifest.package:
-							package_name = manifest.package.encode('utf-8')
-							package_dir = dirpath
-						if manifest.export_module:
-							generator.module |= manifest.export_module
-						if not manifest.strict:
-							self.strict = False
-						merge_properties(self.root_manifest_props, manifest.properties)
+					if manifest.package:
+						package_name = manifest.package
+						if PY2:
+							package_name = package_name.encode('utf-8')
+						package_dir = dirpath
+					if manifest.export_module:
+						generator.module |= manifest.export_module
+					if not manifest.strict:
+						self.strict = False
+					merge_properties(self.root_manifest_props, manifest.properties)
+
+					if manifest.use_only_for:
+						if not (set(manifest.use_only_for) & self.platforms):
+							continue
 
 				for filename in filenames:
 					relpath = os.path.relpath(dirpath, package_dir)
@@ -167,7 +176,7 @@ class Compiler(object):
 			init_path = os.path.join(project_dir, '.core.js')
 			if os.path.exists(init_path):
 				if self.verbose:
-					print 'including platform initialisation file at %s' %init_path
+					print('including platform initialisation file at %s' %init_path, file=sys.stderr)
 				with open(init_path) as f:
 					init_js += f.read()
 
@@ -194,7 +203,7 @@ class Compiler(object):
 		merge_properties(self.root_manifest_props, self.root_manifest.properties)
 
 		if self.verbose:
-			print "generating sources..."
+			print("generating sources...", file=sys.stderr)
 
 		appcode = ""
 		if self.strict:
@@ -206,29 +215,28 @@ class Compiler(object):
 
 		def write_properties(prefix, props):
 			r = ''
-			for k, v in sorted(props.iteritems()):
+			for k, v in sorted(props.items()):
 				k = compiler.js.escape_id(k)
 				if isinstance(v, dict):
 					r += write_properties(prefix + '$' + k, v)
 				else:
 					r += "var %s$%s = %s\n" %(prefix, k, json.dumps(v))
 			return r
-		appcode += write_properties('$manifest', self.root_manifest_props).encode('utf-8')
+		appcode += write_properties('$manifest', self.root_manifest_props)
 
-		appcode += "/** @const @type {!CoreObject} */\n"
 		appcode += "var " + generator.generate()
 		appcode += generator.generate_startup(namespace, self.app)
 		appcode = appcode.replace('/* ${init.js} */', init_js)
 
 		with open(os.path.join(self.output_dir, namespace + "." + self.app + ".js"), "wt") as f:
-			f.write(appcode.encode('utf-8'))
+			f.write(appcode)
 
 		if self.documentation:
 			self.documentation.generate(self.component_path_map)
 
-		print "done"
+		print("done", file=sys.stderr)
 
-	def __init__(self, output_dir, root, project_dirs, root_manifest, app, doc = None, release = False, verbose = False, jobs = 1):
+	def __init__(self, output_dir, root, project_dirs, root_manifest, app, platforms, doc = None, release = False, verbose = False, jobs = 1):
 		self.cache = Cache()
 		self.root = root
 		self.output_dir = output_dir
@@ -241,9 +249,10 @@ class Compiler(object):
 		self.verbose = verbose
 		self.jobs = int(jobs) if jobs is not None else cpu_count()
 		self.component_path_map = {}
+		self.platforms = platforms
 
 		if self.verbose:
-			print 'running using %d jobs' %self.jobs
+			print('running using %d jobs' %self.jobs, file=sys.stderr)
 
 		with open(os.path.join(root, 'partners.json')) as f:
 			self.partners = json.load(f)
@@ -251,7 +260,7 @@ class Compiler(object):
 		self.documentation = compiler.doc.json.Documentation(doc) if doc else None
 
 
-def compile_qml(output_dir, root, project_dirs, root_manifest, app, wait = False, doc = None, release = False, verbose = False, jobs = 1):
+def compile_qml(output_dir, root, project_dirs, root_manifest, app, platforms = set(), wait = False, doc = None, release = False, verbose = False, jobs = 1):
 	if wait:
 		try:
 			import pyinotify
@@ -282,9 +291,9 @@ def compile_qml(output_dir, root, project_dirs, root_manifest, app, wait = False
 					self.modified = False
 					return r
 		except:
-			raise Exception("seems that you don't have pyinotify module installed, you can't use -w without it")
+			raise Exception("it seems you don't have pyinotify module installed, please install it to run build with -d option")
 
-	c = Compiler(output_dir, root, project_dirs, root_manifest, app, doc=doc, release=release, verbose=verbose, jobs=jobs)
+	c = Compiler(output_dir, root, project_dirs, root_manifest, app, platforms, doc=doc, release=release, verbose=verbose, jobs=jobs)
 
 	notifier = None
 
@@ -313,7 +322,7 @@ def compile_qml(output_dir, root, project_dirs, root_manifest, app, wait = False
 				msg = '%serror: %s' %(loc, ex)
 				if hasattr(ex, 'line'):
 					msg += '\n' + ex.line
-				print msg
+				print(msg, file=sys.stderr)
 				if verbose:
 					raise
 				sys.exit(1)

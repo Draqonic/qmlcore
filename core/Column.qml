@@ -43,13 +43,14 @@ Layout {
 
 	///@private
 	function addChild(child) {
-		_globals.core.Item.prototype.addChild.apply(this, arguments)
+		$core.Item.prototype.addChild.apply(this, arguments)
 
 		if (!('height' in child))
 			return
 
 		child.onChanged('height', this._scheduleLayout.bind(this))
 		child.onChanged('recursiveVisible', this._scheduleLayout.bind(this))
-		child.anchors.on('marginsUpdated', this._scheduleLayout.bind(this))
+		child.on('anchorsMarginsUpdated', this._scheduleLayout.bind(this))
+		this._scheduleLayout()
 	}
 }

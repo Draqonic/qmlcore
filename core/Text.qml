@@ -12,8 +12,8 @@ Item {
 	property enum elide { ElideNone, ElideLeft, ElideMiddle, ElideRight };
 	property int paintedWidth;		///< real width of the text without any layout applied
 	property int paintedHeight;		///< real height of this text without any layout applied
-	width: paintedWidth;	///< @private
-	height: paintedHeight;	///< @private
+	width: paintedWidth;
+	height: paintedHeight;
 
 	///@private
 	constructor: {
@@ -55,16 +55,16 @@ Item {
 					this._enableSizeUpdate()
 			}
 		}
-		_globals.core.Object.prototype.onChanged.apply(this, arguments);
+		$core.Item.prototype.onChanged.apply(this, arguments);
 	}
 
 	///@private
 	function on(name, callback) {
 		if (!this._updateSizeNeeded) {
-			if (name == 'newBoundingBox')
+			if (name === 'newBoundingBox')
 				this._enableSizeUpdate()
 		}
-		_globals.core.Object.prototype.on.apply(this, arguments)
+		$core.Item.prototype.on.apply(this, arguments)
 	}
 
 	///@private
@@ -73,7 +73,7 @@ Item {
 			this.style('text-shadow', this.shadow._getFilterStyle())
 		else
 			this.style('text-shadow', '')
-		_globals.core.Item.prototype._updateStyle.apply(this, arguments)
+		$core.Item.prototype._updateStyle.apply(this, arguments)
 	}
 
 	///@private
@@ -105,12 +105,19 @@ Item {
 	}
 
 	onTextChanged:				{ this._setText(value); this._updateSize() }
-	onColorChanged: 			{ this.style('color', _globals.core.Color.normalize(value)) }
+	onColorChanged: 			{ this.style('color', $core.Color.normalize(value)) }
 	onWidthChanged:				{ this._updateSize() }
+	onHeightChanged:			{ this._updateSize() }
 
 	onVerticalAlignmentChanged: {
-		this.verticalAlignment = value;
 		this._enableSizeUpdate()
+		if ($manifest$requireVerticalTextAlignmentStyle) {
+			switch(value) {
+				case this.AlignTop:		this.style('-pure-text-vertical-align', 'top'); break
+				case this.AlignVCenter:	this.style('-pure-text-vertical-align', 'middle'); break
+				case this.AlignBottom:	this.style('-pure-text-vertical-align', 'bottom'); break
+			}
+		}
 	}
 
 	onHorizontalAlignmentChanged: {

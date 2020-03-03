@@ -1,12 +1,19 @@
+from __future__ import unicode_literals
+from builtins import object, str
+from past.builtins import basestring
+
 import re
+
+trivial_value_re = re.compile(r'\$\{manifest\.[a-zA-Z0-9\$\.]+\}\Z')
 
 def value_is_trivial(value):
 	if isinstance(value, bool):
 		return True
 
-	assert not isinstance(value, unicode)
-	if value is None or not isinstance(value, str):
+	if value is None or not isinstance(value, (str, basestring)):
 		return False
+
+	value = str(value)
 
 	if value[0] == '(' and value[-1] == ')':
 		value = value[1:-1]
@@ -14,7 +21,7 @@ def value_is_trivial(value):
 	if value == 'true' or value == 'false' or value == 'null':
 		return True
 
-	if value.startswith('${manifest.'):
+	if trivial_value_re.match(value):
 		return True
 
 	try:
@@ -28,12 +35,16 @@ def value_is_trivial(value):
 	#print "?trivial", value
 	return False
 
+class Entity(object):
+	def __init__(self):
+		self.doc = None
+
 def to_string(value):
-	if isinstance(value, str):
+	if isinstance(value, (str, basestring)):
 		return value
 	elif isinstance(value, bool):
 		return 'true' if value else 'false'
-	elif isinstance(value, object):
+	elif isinstance(value, Entity):
 		return value
 	else:
 		return str(value)
@@ -44,10 +55,6 @@ def handle_property_path(t):
 class DocumentationString(object):
 	def __init__(self, text):
 		self.text = text
-
-class Entity(object):
-	def __init__(self):
-		self.doc = None
 
 class Component(Entity):
 	def __init__(self, name, children):
@@ -63,6 +70,11 @@ class Property(Entity):
 		self.type = type
 		self.properties = properties
 
+class Const(Entity):
+	def __init__(self, type, name, value):
+		super(Const, self).__init__()
+		self.type, self.name, self.value = type, name, value
+
 class AliasProperty(Entity):
 	def __init__(self, name, target):
 		super(AliasProperty, self).__init__()
@@ -77,12 +89,13 @@ class EnumProperty(Entity):
 		self.default = default
 
 class Method(Entity):
-	def __init__(self, name, args, code, event):
+	def __init__(self, name, args, code, event, async_):
 		super(Method, self).__init__()
 		self.name = name
 		self.args = args
 		self.code = code
 		self.event = event
+		self.async_ = async_
 
 class IdAssignment(Entity):
 	def __init__(self, name):
@@ -91,6 +104,7 @@ class IdAssignment(Entity):
 
 class Assignment(Entity):
 	re_name = re.compile('<property-name>')
+	re_scale_name = re.compile('<scale-property-name>')
 
 	def __init__(self, target, value):
 		super(Assignment, self).__init__()
@@ -103,10 +117,15 @@ class Assignment(Entity):
 		elif property_name == 'y':
 			property_name = 'height'
 
-		if isinstance(value, str):
-			self.value = Assignment.re_name.sub(property_name, value)
+		value = self.replace(Assignment.re_name, property_name, value)
+		property_name = 'virtualScale'
+		self.value = self.replace(Assignment.re_scale_name, property_name, value)
+
+	def replace(self, rex, property_name, value):
+		if isinstance(value, (str, basestring)):
+			return rex.sub(property_name, value)
 		else:
-			self.value = to_string(value)
+			return to_string(value)
 
 	def is_trivial(self):
 		return value_is_trivial(self.value)

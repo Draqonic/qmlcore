@@ -2,9 +2,13 @@
 BaseView {
 	property enum orientation { Vertical, Horizontal };	///< orientation direction
 
+	constructor: {
+		this._sizes = []
+	}
+
 	///@private
 	function move(dx, dy) {
-		var horizontal = this.orientation == this.Horizontal
+		var horizontal = this.orientation === this.Horizontal
 		var x, y
 		if (horizontal && this.contentWidth > this.width) {
 			x = this.contentX + dx
@@ -27,34 +31,14 @@ BaseView {
 	function positionViewAtIndex(idx) {
 		if (this.trace)
 			log('positionViewAtIndex ' + idx)
-		var cx = this.contentX, cy = this.contentY
+		var horizontal = this.orientation === this.Horizontal
 		var itemBox = this.getItemPosition(idx)
-		var x = itemBox[0], y = itemBox[1]
-		var iw = itemBox[2], ih = itemBox[3]
-		var w = this.width, h = this.height
-		var horizontal = this.orientation == this.Horizontal
 		var center = this.positionMode === this.Center
 
 		if (horizontal) {
-			var atCenter = x - w / 2 + iw / 2
-			if (center && this.contentWidth > w)
-				this.contentX = atCenter < 0 ? 0 : x > this.contentWidth - w / 2 - iw / 2 ? this.contentWidth - w : atCenter
-			else if (iw > w)
-				this.contentX = atCenter
-			else if (x - cx < 0)
-				this.contentX = x
-			else if (x - cx + iw > w)
-				this.contentX = x + iw - w
+			this.positionViewAtItemHorizontally(itemBox, center, true)
 		} else {
-			var atCenter = y - h / 2 + ih / 2
-			if (center && this.contentHeight > h)
-				this.contentY = atCenter < 0 ? 0 : y > this.contentHeight - h / 2 - ih / 2 ? this.contentHeight - h : atCenter
-			else if (ih > h)
-				this.contentY = atCenter
-			else if (y - cy < 0)
-				this.contentY = y
-			else if (y - cy + ih > h)
-				this.contentY = y + ih - h
+			this.positionViewAtItemVertically(itemBox, center, true)
 		}
 	}
 
@@ -65,39 +49,51 @@ BaseView {
 			return false;
 		}
 
-		var horizontal = this.orientation == this.Horizontal
+		var horizontal = this.orientation === this.Horizontal
 		if (horizontal) {
-			if (key == 'Left') {
-				if (!this.currentIndex && !this.keyNavigationWraps) {
+			if (key === 'Left') {
+				if (this.currentIndex === 0 && !this.keyNavigationWraps) {
 					event.accepted = false;
 					return false;
+				} else if (this.currentIndex === 0 && this.keyNavigationWraps) {
+					this.currentIndex = this.count - 1;
+				} else {
+					--this.currentIndex;
 				}
-				--this.currentIndex;
 				event.accepted = true;
 				return true;
-			} else if (key == 'Right') {
-				if (this.currentIndex == this.count - 1 && !this.keyNavigationWraps) {
+			} else if (key === 'Right') {
+				if (this.currentIndex === this.count - 1 && !this.keyNavigationWraps) {
 					event.accepted = false;
 					return false;
+				} else if (this.currentIndex === this.count - 1 && this.keyNavigationWraps) {
+					this.currentIndex = 0;
+				} else {
+					++this.currentIndex;
 				}
-				++this.currentIndex;
 				event.accepted = true;
 				return true;
 			}
 		} else {
-			if (key == 'Up') {
-				if (!this.currentIndex && !this.keyNavigationWraps) {
+			if (key === 'Up') {
+				if (this.currentIndex === 0 && !this.keyNavigationWraps) {
 					event.accepted = false;
 					return false;
+				} else if (this.currentIndex === 0 && this.keyNavigationWraps) {
+					this.currentIndex = this.count - 1;
+				} else {
+					--this.currentIndex;
 				}
-				--this.currentIndex;
 				return true;
-			} else if (key == 'Down') {
-				if (this.currentIndex == this.count - 1 && !this.keyNavigationWraps) {
+			} else if (key === 'Down') {
+				if (this.currentIndex === this.count - 1 && !this.keyNavigationWraps) {
 					event.accepted = false;
 					return false;
+				} else if (this.currentIndex === this.count - 1 && this.keyNavigationWraps) {
+					this.currentIndex = 0;
+				} else {
+					++this.currentIndex;
 				}
-				++this.currentIndex;
 				event.accepted = true;
 				return true;
 			}
@@ -136,7 +132,7 @@ BaseView {
 		var items = this._items
 		x += this.contentX
 		y += this.contentY
-		if (this.orientation == ListView.Horizontal) {
+		if (this.orientation === ListView.Horizontal) {
 			for (var i = 0; i < items.length; ++i) {
 				var item = items[i]
 				if (!item)
@@ -176,6 +172,7 @@ BaseView {
 		var horizontal = this.orientation === this.Horizontal
 
 		var items = this._items
+		var sizes = this._sizes
 		var n = items.length
 		var w = this.width, h = this.height
 		var created = false
@@ -184,7 +181,7 @@ BaseView {
 		var size = horizontal? w: h
 		var maxW = 0, maxH = 0
 
-		var itemsCount = 0
+		var currentIndex = this.currentIndex
 		var prerender = noPrerender? 0: this.prerender * size
 		var leftMargin = -prerender
 		var rightMargin = size + prerender
@@ -192,47 +189,90 @@ BaseView {
 		if (this.trace)
 			log("layout " + n + " into " + w + "x" + h + " @ " + this.content.x + "," + this.content.y + ", prerender: " + prerender + ", range: " + leftMargin + ":" + rightMargin)
 
-		for(var i = 0; i < n && (itemsCount == 0 || p + c < rightMargin); ++i) {
+		var getItemSize = horizontal?
+			function(item) { return item.width }:
+			function(item) { return item.height }
+
+		var itemsCount = 0
+		var refSize
+		for(var i = 0; i < n && (refSize === undefined || p + c < rightMargin); ++i, ++itemsCount) {
 			var item = items[i]
+			var viewPos = p + c
+
+			var s = sizes[i] || refSize
+			if (refSize === undefined && s !== undefined)
+				refSize = s
+
+			var renderable = (viewPos + (s !== undefined? s: 0) >= leftMargin && viewPos < rightMargin) || currentIndex === i
 
 			if (!item) {
-				if (p + c >= rightMargin && itemsCount > 0)
-					break
-				item = this._createDelegate(i)
-				created = true
+				//we can render, or no sizes available
+				if (renderable || s === undefined) {
+					item = this._createDelegate(i)
+					created = true
+				}
 			}
 
-			++itemsCount
+			if (item)
+				s = refSize = sizes[i] = getItemSize(item)
 
-			var s = (horizontal? item.width: item.height)
-			var visible = (p + c + s >= 0 && p + c < size) //checking real delegate visibility, without prerender margin
+			if (item) {
+				var visible = (viewPos + s >= 0 && viewPos < size) //checking real delegate visibility, without prerender margin
 
-			if (item.x + item.width > maxW)
-				maxW = item.width + item.x
-			if (item.y + item.height > maxH)
-				maxH = item.height + item.y
+				if (item.x + item.width > maxW)
+					maxW = item.width + item.x
+				if (item.y + item.height > maxH)
+					maxH = item.height + item.y
 
-			if (horizontal)
-				item.viewX = p
-			else
-				item.viewY = p
+				if (horizontal)
+					item.viewX = p
+				else
+					item.viewY = p
 
-			if (this.currentIndex === i && !item.focused) {
-				this.focusChild(item)
-				if (this.contentFollowsCurrentItem && this.size)
-					this.positionViewAtIndex(i)
+				if (currentIndex === i && !item.focused) {
+					this.focusChild(item)
+					if (this.contentFollowsCurrentItem && this.size)
+						this.positionViewAtIndex(i)
+				}
+
+				item.visibleInView = visible
+
+				if (!renderable) {
+					if (this.trace)
+						log('discarding delegate', i)
+					this._discardItem(item)
+					items[i] = null
+					created = true
+				}
+			} else {
+				var nextP = p + refSize
+				if (horizontal) {
+					if (nextP > maxW)
+						maxW = nextP
+				} else {
+					if (nextP > maxH)
+						maxH = nextP
+				}
 			}
 
-			item.visibleInView = visible
 			p += s + this.spacing
 		}
 		for( ;i < n; ++i) {
 			var item = items[i]
-			if (item)
+			if (item) {
 				item.visibleInView = false
+				this._discardItem(item)
+				items[i] = null
+				created = true
+			}
 		}
 		if (p > 0)
 			p -= this.spacing;
+
+		if (sizes.length > items.length) {
+			///fixme: override model update api to make sizes stable
+			sizes = sizes.slice(0, items.length)
+		}
 
 		if (itemsCount)
 			p *= items.length / itemsCount
@@ -257,7 +297,7 @@ BaseView {
 
 	/// @private creates delegate in given item slot
 	function _createDelegate(idx) {
-		var item = _globals.core.BaseView.prototype._createDelegate.apply(this, arguments)
+		var item = $core.BaseView.prototype._createDelegate.apply(this, arguments)
 		//connect both dimensions, because we calculate maxWidth/maxHeight in contentWidth/contentHeight
 		item.onChanged('width', this._scheduleLayout.bind(this))
 		item.onChanged('height', this._scheduleLayout.bind(this))
@@ -268,7 +308,7 @@ BaseView {
 	function _updateOverflow() {
 		if (!this.nativeScrolling)
 			return
-		var horizontal = this.orientation == this.Horizontal
+		var horizontal = this.orientation === this.Horizontal
 		var style = {}
 		if (horizontal) {
 			style['overflow-x'] = 'auto'
@@ -284,6 +324,7 @@ BaseView {
 	onOrientationChanged: {
 		this._updateOverflow()
 		this._scheduleLayout()
+		this._sizes = []
 	}
 
 	onCompleted: {

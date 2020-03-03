@@ -9,6 +9,11 @@ Item {
 	property Stylesheet stylesheet: Stylesheet { }		///< @private
 	property string buildIdentifier; ///< @private
 
+	property int virtualWidth: manifest.virtual.width;	///< virtual viewport width
+	property int virtualHeight: manifest.virtual.height;///< virtual viewport height
+	property real virtualScale: Math.min((system.resolutionWidth || width) / virtualWidth, (system.resolutionHeight || height) / virtualHeight);	///< @private
+	signal message;	///< incoming postMessage
+
 	visibleInView: false; //startup
 
 	///@private
@@ -24,12 +29,11 @@ Item {
 		this._delayedActions = []
 		this._completedObjects = []
 		this._stylesRegistered = {}
-		this._asyncInvoker = _globals.core.safeCall(this, [], function (ex) { log("async action failed:", ex, ex.stack) })
+		this._asyncInvoker = $core.safeCall(this, [], function (ex) { log("async action failed:", ex, ex.stack) })
 
 		this.backend = _globals._backend()
 
 		this._init()
-		this._onCompleted(this) //my context was null at the moment of calling Object ctor
 
 		document.documentElement.style.overflowY = 'auto'
 		document.documentElement.style.overflowX = 'hidden'
@@ -140,7 +144,7 @@ Item {
 	}
 
 	///@private
-	function _onCompleted(object) {
+	function __onCompleted(object) {
 		this._completedObjects.push(object)
 	}
 
@@ -148,7 +152,7 @@ Item {
 
 	///@internal
 	function scheduleComplete() {
-		this.delayedAction('completed', this, this._processActions)
+		this.delayedAction('context:completed', this, this._processActions)
 	}
 
 	///@private
@@ -211,25 +215,18 @@ Item {
 
 	///@private
 	function delayedAction(name, self, method, delay) {
-		var registry = self._registeredDelayedActions
-
-		if (registry === undefined)
-			registry = self._registeredDelayedActions = {}
-
-		if (registry[name] === true)
+		if (!self._registerDelayedAction(name))
 			return
 
-		registry[name] = true
-
 		var callback = function() {
-			registry[name] = false
+			self._cancelDelayedAction(name)
 			method.call(self)
 		}
 
 		if (delay > 0) {
-			setTimeout(callback, delay)
+			setTimeout(this.wrapNativeCallback(callback), delay)
 		} else if (delay === 0) {
-			this.backend.requestAnimationFrame(callback)
+			this.backend.requestAnimationFrame(this.wrapNativeCallback(callback))
 		} else {
 			this.scheduleAction(callback)
 		}
@@ -249,12 +246,21 @@ Item {
 		return text.replace(/%(\d+)/, function(text, index) { return args[index] })
 	}
 
-	function processKey(event) {
-		var handlers = core.forEach(this, _globals.core.Item.prototype._enqueueNextChildInFocusChain, [])
+	function tr()
+	{ return this.qsTr.apply(this, arguments) }
+
+	function updateL10n(lang, data) {
+		this.l10n[lang] = data
+		var storage = this.__properties.language
+		storage.callOnChanged(this, 'language', this.language, this.language)
+	}
+
+	function processKey(key, event) {
+		var handlers = core.forEach(this, $core.Item.prototype._enqueueNextChildInFocusChain, [])
 		var n = handlers.length
 		for(var i = 0; i < n; ++i) {
 			var handler = handlers[i]
-			if (handler._processKey(event))
+			if (handler._processKey(key, event))
 				return true
 		}
 		return false

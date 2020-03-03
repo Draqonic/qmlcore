@@ -8,7 +8,7 @@ BaseView {
 
 	///@private
 	function move(dx, dy) {
-		var horizontal = this.flow == this.FlowLeftToRight
+		var horizontal = this.flow === this.FlowLeftToRight
 		var x, y
 		if (horizontal && this.contentHeight > this.height) {
 			y = this.contentY + dy
@@ -32,67 +32,110 @@ BaseView {
 		if (!this.handleNavigationKeys)
 			return false;
 
-		var horizontal = this.flow == this.FlowLeftToRight
-		if (horizontal) {
-			switch(key) {
-				case 'Left':
-					if (!this.keyNavigationWraps && this.currentIndex == 0)
-						return false
-					--this.currentIndex
-					return true
-				case 'Right':
-					if (!this.keyNavigationWraps && this.currentIndex == this.columns - 1)
-						return false
-					++this.currentIndex
-					return true
-				case 'Up':
-					if (!this.keyNavigationWraps && this.currentIndex < this.columns)
-						return false
-					this.currentIndex -= this.columns
-					return true
-				case 'Down':
-					if (!this.keyNavigationWraps && this.currentIndex > this.count - this.columns + 1)
-						return false
-					this.currentIndex += this.columns
-					return true
-			}
-		} else {
-			switch(key) {
-				case 'Up':
-					if (!this.keyNavigationWraps && this.currentIndex == 0)
-						return false
-					--this.currentIndex
-					return true
-				case 'Down':
-					if (!this.keyNavigationWraps && this.currentIndex == this.columns - 1)
-						return false
-					++this.currentIndex
-					return true
-				case 'Left':
-					if (!this.keyNavigationWraps && this.currentIndex < this.rows)
-						return false
-					this.currentIndex -= this.rows
-					return true
-				case 'Right':
-					if (!this.keyNavigationWraps && this.currentIndex > this.count - this.rows + 1)
-						return false
-					this.currentIndex += this.rows
-					return true
-			}
+		switch (key) {
+			case 'Up': return this.moveUp()
+			case 'Down': return this.moveDown()
+			case 'Left': return this.moveLeft()
+			case 'Right': return this.moveRight()
 		}
+	}
+
+	onCountChanged: {
+		if (value == 0) {
+			this.rows = 0
+			this.columns = 0
+		}
+	}
+
+	moveUp: {
+		if (this.flow === this.FlowLeftToRight) {
+			if (!this.keyNavigationWraps && this.currentIndex < this.columns)
+				return false
+
+			if (this.keyNavigationWraps && this.currentIndex - this.columns < 0)
+				this.currentIndex = this.count - 1
+			else if (this.currentIndex - this.columns < 0)
+				this.currentIndex = 0
+			else
+				this.currentIndex -= this.columns
+		} else {
+			if (!this.keyNavigationWraps && this.currentIndex === 0)
+				return false
+			--this.currentIndex
+		}
+		return true
+	}
+
+	moveDown: {
+		if (this.flow === this.FlowLeftToRight) {
+			var row = Math.floor(this.currentIndex / (this.columns))
+			var rowsCount = Math.floor(this.count / (this.columns))
+			if (!this.keyNavigationWraps && row >= rowsCount)
+				return false
+
+			if (this.keyNavigationWraps && this.currentIndex + this.columns >= this.count)
+				this.currentIndex = 0
+			else if (this.currentIndex + this.columns >= this.count)
+				this.currentIndex = this.count - 1
+			else
+				this.currentIndex += this.columns
+		} else {
+			if (!this.keyNavigationWraps && this.currentIndex === this.columns - 1)
+				return false
+			++this.currentIndex
+		}
+		return true
+	}
+
+	moveLeft: {
+		if (this.flow === this.FlowLeftToRight) {
+			if (this.keyNavigationWraps && this.currentIndex === 0)
+				this.currentIndex = this.count - 1
+			else if (!this.keyNavigationWraps && this.currentIndex === 0)
+				return false
+			else
+				--this.currentIndex
+		} else {
+			if (!this.keyNavigationWraps && this.currentIndex < this.rows)
+				return false
+			if (this.currentIndex - this.rows < 0)
+				this.currentIndex = 0
+			else
+				this.currentIndex -= this.rows
+		}
+		return true
+	}
+
+	moveRight: {
+		if (this.flow === this.FlowLeftToRight) {
+			if (this.keyNavigationWraps && this.currentIndex === this.count - 1)
+				this.currentIndex = 0
+			else if (!this.keyNavigationWraps && this.currentIndex === this.count - 1)
+				return false
+			else
+				++this.currentIndex
+		} else {
+			if (!this.keyNavigationWraps && this.currentIndex > this.count - this.rows + 1)
+				return false
+			if (this.currentIndex + this.rows >= this.count)
+				this.currentIndex = this.count - 1
+			else
+				this.currentIndex += this.rows
+		}
+		return true
 	}
 
 	///@private
 	function getItemPosition(idx) {
-		var horizontal = this.flow == this.FlowLeftToRight
+		var horizontal = this.flow === this.FlowLeftToRight
 		var x, y, cw = this.cellWidth, ch = this.cellHeight
 		if (horizontal) {
-			if (this.columns == 0)
+			if (this.columns === 0)
 				return [0, 0, 0, 0]
 			x = (idx % this.columns) * cw
 			y = Math.floor(idx / this.columns) * ch
 		} else {
-			if (this.rows == 0)
+			if (this.rows === 0)
 				return [0, 0, 0, 0]
 			x = Math.floor(idx / this.rows) * cw
 			y = (idx % this.rows) * ch
@@ -104,7 +147,7 @@ BaseView {
 	function indexAt(x, y) {
 		x -= this.content.x
 		y -= this.content.y
-		var horizontal = this.flow == this.FlowLeftToRight
+		var horizontal = this.flow === this.FlowLeftToRight
 		x = Math.floor(x / (this.cellWidth + this.spacing))
 		y = Math.floor(y / (this.cellHeight + this.spacing))
 		if (!horizontal) {
@@ -121,7 +164,7 @@ BaseView {
 		var x = itemBox[0], y = itemBox[1]
 		var iw = itemBox[2], ih = itemBox[3]
 		var w = this.width, h = this.height
-		var horizontal = this.flow == this.FlowLeftToRight
+		var horizontal = this.flow === this.FlowLeftToRight
 		if (!horizontal) {
 			if (iw > w) {
 				this.contentX = x - w / 2 + iw / 2
@@ -160,7 +203,7 @@ BaseView {
 			return
 		}
 
-		var horizontal = this.flow == this.FlowLeftToRight
+		var horizontal = this.flow === this.FlowLeftToRight
 
 		var items = this._items
 		var n = items.length

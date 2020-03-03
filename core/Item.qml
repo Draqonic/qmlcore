@@ -6,10 +6,10 @@ Object {
 	property int width;						///< width of visible area
 	property int height;					///< height of visible area
 	property bool clip;						///< clip all children outside rectangular area defined by x, y, width, height
-	property real radius;					///< round corner radius
 	property real scale: 1;
 	property bool fixed;
 	property bool mouseEnabled: true;
+	property lazy radius: Radius { }		///< round corner radius(es), allow forwarding, e.g. item.radius: 5;
 
 	property bool focus;					///< this item can be focused
 	property bool focused; ///< this item is focused among its siblings
@@ -40,7 +40,9 @@ Object {
 	property const verticalCenter:		{ return [this, 5]; }
 
 	//do not use, view internal
-	signal newBoundingBox;						///< emitted when position or size changed
+	signal newBoundingBox;					///< emitted when position or size changed
+	signal anchorsMarginsUpdated;			///< emitted when anchors margins have been changed
+
 	property int viewX;						///< x position in view (if any)
 	property int viewY;						///< y position in view (if any)
 
@@ -54,10 +56,6 @@ Object {
 	constructor: {
 		this._pressedHandlers = {}
 		this._topPadding = 0
-		this._borderXAdjust = 0
-		this._borderYAdjust = 0
-		this._borderWidthAdjust = 0
-		this._borderHeightAdjust = 0
 		if (parent) {
 			if (this.element)
 				throw new Error('double ctor call')
@@ -70,9 +68,9 @@ Object {
 		return "Item (width: " + this.width + ", height: " + this.height + ", x: " + this.x + ", y: " + this.y + ")"
 	}
 
-	///@private
+	///@private release any held resources, including connections, delegates, etc
 	function discard() {
-		_globals.core.Object.prototype.discard.apply(this)
+		$core.Object.prototype.discard.apply(this)
 		this.focusedChild = null
 		this._pressedHandlers = {}
 		if (this.element)
@@ -92,6 +90,7 @@ Object {
 		rules += 'white-space: nowrap; transform: none;'
 		rules += 'left: 0px; top: 0px; width: 0px; height: 0px;'
 		rules += 'font-family: ' + $manifest$style$font$family + '; line-height: ' + $manifest$style$font$lineHeight + '; '
+		rules += 'pointer-events: none; touch-action: none; '
 		if ($manifest$style$font$pixelSize)
 			rules += 'font-size: ' + $manifest$style$font$pixelSize + 'px; '
 		else if ($manifest$style$font$pointSize)
@@ -124,13 +123,16 @@ Object {
 	function toScreen() {
 		var item = this
 		var x = 0, y = 0
-		var w = this.width, h = this.height
+		var w = this.width + (this._borderWidthAdjust || 0) + (this._borderInnerWidthAdjust || 0)
+		var h = this.height + (this._borderHeightAdjust || 0) + (this._borderInnerHeightAdjust || 0)
+
 		while(item) {
-			x += item.x
-			y += item.y
+			x += item.x + item.viewX + (item._borderXAdjust || 0)
+			y += item.y + item.viewY + (item._borderYAdjust || 0)
 			if (item.hasOwnProperty('view')) {
-				x += item.viewX + item.view.content.x
-				y += item.viewY + item.view.content.y
+				var content = item.view.content
+				x += content.x
+				y += content.y
 			}
 			item = item.parent
 		}
@@ -148,7 +150,7 @@ Object {
 
 	///@private adds child, focus it if child accepts focus
 	function addChild (child) {
-		_globals.core.Object.prototype.addChild.apply(this, arguments)
+		$core.Object.prototype.addChild.apply(this, arguments)
 		if (child._tryFocus())
 			child._propagateFocusToParents()
 	}
@@ -181,8 +183,8 @@ Object {
 
 	///@private
 	function _setSizeAdjust() {
-		var x = this.x + this.viewX + this._borderXAdjust
-		var y = this.y + this.viewY + this._borderYAdjust
+		var x = this.x + this.viewX + (this._borderXAdjust || 0)
+		var y = this.y + this.viewY + (this._borderYAdjust || 0)
 
 		if (this.cssTranslatePositioning && !$manifest$cssDisableTransformations) {
 			this.transform.translateX = x
@@ -191,6 +193,7 @@ Object {
 			this.style('left', x)
 			this.style('top', y)
 		}
+		this.newBoundingBox()
 	}
 
 	onRecursiveVisibleChanged: {
@@ -200,15 +203,31 @@ Object {
 			this._updateVisibilityForChild(child, value)
 		}
 
-		if (!value)
+		if (!value && this.parent)
+			this.parent._tryFocus()
+
+		if ($manifest$requireExplicitRecursiveVisibilityStyle) {
+			this.style("-pure-recursive-visibility", value)
+		}
+	}
+
+	onFocusChanged: {
+		if (this.parent)
 			this.parent._tryFocus()
 	}
 
 	onVisibleChanged:		{ this._updateVisibility() }
 	onVisibleInViewChanged:	{ this._updateVisibility() }
 
-	onWidthChanged: 	{ this.style('width', value + this._borderWidthAdjust); this.newBoundingBox() }
-	onHeightChanged:	{ this.style('height', value - this._topPadding + this._borderHeightAdjust); this.newBoundingBox() }
+	onWidthChanged: {
+		this.style('width', value + (this._borderWidthAdjust || 0))
+		this.newBoundingBox()
+	}
+
+	onHeightChanged: {
+		this.style('height', value - this._topPadding + (this._borderHeightAdjust || 0))
+		this.newBoundingBox()
+	}
 
 	onXChanged,
 	onViewXChanged: {
@@ -252,7 +271,6 @@ Object {
 	onOpacityChanged:	{ if (this.element) this.style('opacity', value); }
 	onRotationChanged:	{ this.transform.rotateZ = this.rotation }
 	onZChanged:			{ this.style('z-index', value) }
-	onRadiusChanged:	{ this.style('border-radius', value) }
 	onScaleChanged:		{ this.transform.scaleX = this.scale; this.transform.scaleY = this.scale; }
 	onClipChanged:		{ this.style('overflow', value? 'hidden': 'visible') }
 	onFixedChanged:		{ this.style('position', value ? 'fixed' :  'absolute') }
@@ -266,11 +284,13 @@ Object {
 
 	///@private sets current global focus to component
 	function forceActiveFocus() {
-		var item = this;
+		var item = this
 		while(item.parent) {
 			item.parent._focusChild(item);
 			item = item.parent;
 		}
+		if (this._tryFocus())
+			this._propagateFocusToParents()
 	}
 
 	///@private tries to focus children or item itself
@@ -374,38 +394,35 @@ Object {
 	}
 
 	///@private
-	function _processKey(event) {
-		var keyCode = event.which || event.keyCode
-		var key = _globals.core.keyCodes[keyCode]
+	function _processKey(key, event) {
+		if ($manifest$trace$keys)
+			log(this.getComponentPath(), '_processKey', key, event)
 		var eventTime = event.timeStamp
 
-		if (key !== undefined) {
-			if (this.keyProcessDelay) {
-				if (this._lastEvent && eventTime > this._lastEvent && eventTime - this._lastEvent < this.keyProcessDelay)
-					return true
+		if (this.keyProcessDelay) {
+			if (this._lastEvent && eventTime > this._lastEvent && eventTime - this._lastEvent < this.keyProcessDelay)
+				return true
 
-				this._lastEvent = eventTime
-			}
-
-			//fixme: create invoker only if any of handlers exist
-			var invoker = _globals.core.safeCall(this, [key, event], function (ex) { log("on " + key + " handler failed:", ex, ex.stack) })
-			var proto_callback = this['__key__' + key]
-
-			if (key in this._pressedHandlers)
-				return this.invokeKeyHandlers(key, event, this._pressedHandlers[key], invoker)
-
-			if (proto_callback)
-				return this.invokeKeyHandlers(key, event, proto_callback, invoker)
-
-			var proto_callback = this['__key__Key']
-			if ('Key' in this._pressedHandlers)
-				return this.invokeKeyHandlers(key, event, this._pressedHandlers['Key'], invoker)
-
-			if (proto_callback)
-				return this.invokeKeyHandlers(key, event, proto_callback, invoker)
-		} else {
-			log("unknown keycode " + keyCode + ": [" + event.charCode + " " + event.keyCode + " " + event.which + " " + event.key + " " + event.code + " " + event.location + "]")
+			this._lastEvent = eventTime
 		}
+
+		//fixme: create invoker only if any of handlers exist
+		var invoker = $core.safeCall(this, [key, event], function (ex) { log("on " + key + " handler failed:", ex, ex.stack) })
+		var proto_callback = this['__key__' + key]
+
+		if (key in this._pressedHandlers && this.invokeKeyHandlers(key, event, this._pressedHandlers[key], invoker))
+			return true
+
+		if (proto_callback && this.invokeKeyHandlers(key, event, proto_callback, invoker))
+			return true
+
+		var proto_callback = this['__key__Key']
+		if ('Key' in this._pressedHandlers  && this.invokeKeyHandlers(key, event, this._pressedHandlers['Key'], invoker))
+			return true
+
+		if (proto_callback && this.invokeKeyHandlers(key, event, proto_callback, invoker))
+			return true
+
 		return false
 	}
 
@@ -423,24 +440,15 @@ Object {
 			this._pressedHandlers[name] = [wrapper];
 	}
 
-	/// outputs component path in qml (e.g Rectangle → Item → ListItem → Rectangle)
-	function getComponentPath() {
-		var path = []
-		var self = this
-		while(self) {
-			path.unshift(self.componentName)
-			self = self.parent
-		}
-		return path.join(" → ")
-	}
-
 	/// focus this item
-	setFocus:		{ this.forceActiveFocus() }
+	function setFocus() {
+		this.forceActiveFocus()
+	}
 
 	Timer {
 		id: hack;
 		interval: 100;
 		running: true;
 		onTriggered: { this.parent._updateAbsoluteCoords() }
-	}
+    }
 }

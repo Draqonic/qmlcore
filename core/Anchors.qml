@@ -17,13 +17,14 @@ Object {
 	property int leftMargin;	///< left margin value
 	property int rightMargin;	///< right margin value
 
-	signal marginsUpdated;		///< @private
-
 	constructor : {
 		this._items = []
-		this._scheduleUpdate = function() { this._context.delayedAction('update-anchors', this, this._updateAll) }.bind(this)
 		this._grabX = false
 		this._grabY = false
+	}
+
+	function _scheduleUpdate() {
+		this._context.delayedAction('update-anchors', this, this._updateAll)
 	}
 
 	function _grab(item, prop) {
@@ -43,6 +44,8 @@ Object {
 	function _updateAll() {
 		var anchors = this
 		var item = anchors.parent
+		if (item === null) //disposed
+			return
 		var parent = item.parent
 
 		var parent_box = parent.toScreen()
@@ -63,9 +66,21 @@ Object {
 		var tm = anchors.topMargin || anchors.margins
 		var bm = anchors.bottomMargin || anchors.margins
 
+		var cacheObjects = []
+		var cachePositions = []
+
 		var toScreen = function(line) {
 			var object = line[0], index = line[1]
-			return object.toScreen()[index]
+			var objectIdx = cacheObjects.indexOf(object)
+			var screenPos
+			if (objectIdx < 0) {
+				screenPos = object.toScreen()
+				cacheObjects.push(object)
+				cachePositions.push(screenPos)
+			}
+			else
+				screenPos = cachePositions[objectIdx]
+			return screenPos[index]
 		}
 
 		var left, top, right, bottom, hcenter, vcenter
@@ -130,7 +145,7 @@ Object {
 		//connect only once per item
 		if (items.indexOf(src) < 0) {
 			items.push(src)
-			this.connectOn(src, 'newBoundingBox', this._scheduleUpdate)
+			this.connectOn(src, 'newBoundingBox', this._scheduleUpdate.bind(this))
 		}
 	}
 
@@ -261,5 +276,5 @@ Object {
 	onRightMarginChanged,
 	onTopMarginChanged,
 	onBottomMarginChanged,
-	onMarginChanged:		{ this.marginsUpdated(); this._scheduleUpdate(); }
+	onMarginChanged:		{ this.parent.anchorsMarginsUpdated(); this._scheduleUpdate(); }
 }

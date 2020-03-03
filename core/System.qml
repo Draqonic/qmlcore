@@ -16,8 +16,11 @@ Object {
 	property int screenHeight;						///< device screen height value
 	property int contextWidth: context.width;		///< @private
 	property int contextHeight: context.height;						///< @private
+	property int resolutionWidth;					///< app screen width from manifest
+	property int resolutionHeight;					///< app screen height from manifest
 	property enum device { Desktop, Tv, Mobile };	///< device type enumeration, values: Desktop, Tv or Mobile
 	property enum layoutType { MobileS, MobileM, MobileL, Tablet, Laptop, LaptopL, Laptop4K };	///< layout type enumeration, values: MobileS, MobileM, MobileL, Tablet, Laptop, LaptopL and Laptop4K
+	property bool virtualKeyboard: device === System.Tv || device === System.Mobile; ///< used to tweak components which use on-screen keyboard
 
 	/// @private
 	onContextWidthChanged: { this._updateLayoutType() }
@@ -48,13 +51,13 @@ Object {
 
 	/// @private
 	constructor: {
-		this.vendor = _globals.core.vendor
-		this.device = _globals.core.device
-		this.os = _globals.core.os
+		this.vendor = $core.vendor
+		this.device = $core.device
+		this.os = $core.os
 
-		this.browser = _globals.core.browser
-		this.userAgent = _globals.core.userAgent
-		this.language = _globals.core.language
+		this.browser = $core.browser
+		this.userAgent = $core.userAgent
+		this.language = $core.language
 
 		var ctx = this._context
 		ctx.language = this.language.replace('-', '_')
@@ -63,5 +66,8 @@ Object {
 		this.support3dTransforms = ctx.backend.capabilities.csstransforms3d || false
 		this.supportTransforms = ctx.backend.capabilities.csstransforms || false
 		this.supportTransitions = ctx.backend.capabilities.csstransitions || false
+
+		this.resolutionWidth = $manifest$resolutionWidth
+		this.resolutionHeight = $manifest$resolutionHeight
 	}
 }

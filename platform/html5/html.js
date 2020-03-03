@@ -148,8 +148,10 @@ var getPrefixedName = function(name) {
 
 exports.getPrefixedName = getPrefixedName
 
-var passiveListeners = ['touchstart', 'touchend', 'wheel', 'scroll']
+var passiveListeners = ['touchstart', 'touchmove', 'touchend', 'wheel', 'mousewheel', 'scroll']
 var passiveArg = Modernizr.passiveeventlisteners ? {passive: true} : false
+var mouseEvents = ['mousedown', 'mouseup', 'click', 'dblclick', 'mousemove', 'mouseover', 'mousewheel', 'mouseout', 'contextmenu']
+var touchEvents = ['touchstart', 'touchmove', 'touchend', 'touchcancel']
 
 var registerGenericListener = function(target) {
 	var storage = target.__domEventListeners
@@ -167,10 +169,31 @@ var registerGenericListener = function(target) {
 			if (passiveListeners.indexOf(name) >= 0)
 				args.push(passiveArg)
 
+			if (mouseEvents.indexOf(name) >= 0) {
+				var n = target.__mouseHandlerCount = ~~target.__mouseHandlerCount + 1
+				if (n === 1)
+					target.style('pointer-events', 'auto')
+			}
+			if (touchEvents.indexOf(name) >= 0) {
+				var n = target.__touchHandlerCount = ~~target.__touchHandlerCount + 1
+				if (n === 1)
+					target.style('touch-action', 'auto')
+			}
+
 			target.dom.addEventListener.apply(target.dom, args)
 		},
 		function(name) {
 			//log('removing generic event', name)
+			if (mouseEvents.indexOf(name) >= 0) {
+				var n = target.__mouseHandlerCount = ~~target.__mouseHandlerCount - 1
+				if (n <= 0)
+					target.style('pointer-events', 'none')
+			}
+			if (touchEvents.indexOf(name) >= 0) {
+				var n = target.__touchHandlerCount = ~~target.__touchHandlerCount - 1
+				if (n <= 0)
+					target.style('touch-action', 'none')
+			}
 			target.dom.removeEventListener(name, storage[name])
 		}
 	)
@@ -223,8 +246,7 @@ exports.Element = function(context, tag, cls) {
 	this._context = context
 	this._transitions = {}
 	this._class = ''
-	this._widthAdjust = 0
-	this._uniqueId = String(++lastId)
+	this._uniqueId = (++lastId).toString(36)
 	this._firstChildIndex = 0
 
 	registerGenericListener(this)
@@ -266,7 +288,6 @@ ElementPrototype.removeChildren = function(ui) {
 
 
 ElementPrototype.setHtml = function(html, component) {
-	this._widthAdjust = 0 //reset any text related rounding corrections
 	var dom = this.dom
 	var children
 	if (component !== undefined)
@@ -279,7 +300,7 @@ ElementPrototype.setHtml = function(html, component) {
 
 ElementPrototype.width = function() {
 	this.updateStyle()
-	return this.dom.clientWidth - this._widthAdjust
+	return this.dom.clientWidth
 }
 
 ElementPrototype.height = function() {
@@ -289,7 +310,7 @@ ElementPrototype.height = function() {
 
 ElementPrototype.fullWidth = function() {
 	this.updateStyle()
-	return this.dom.scrollWidth - this._widthAdjust
+	return this.dom.scrollWidth
 }
 
 ElementPrototype.fullHeight = function() {
@@ -297,20 +318,43 @@ ElementPrototype.fullHeight = function() {
 	return this.dom.scrollHeight
 }
 
+var overflowStyles = ['overflow', 'overflow-x', 'overflow-y']
+
 ElementPrototype.style = function(name, style) {
 	var cache = this._context._styleCache
 	if (style !== undefined) {
 		cache.update(this, name, style)
+		if (overflowStyles.indexOf(name) >= 0) {
+			cache.update(this, 'pointer-events', 'auto')
+			cache.update(this, 'touch-action', 'auto')
+		}
 	} else if (typeof name === 'object') { //style({ }) assignment
-		for(var k in name)
+		for(var k in name) {
+			if (overflowStyles.indexOf(name) >= 0) {
+				cache.update(this, 'pointer-events', 'auto')
+				cache.update(this, 'touch-action', 'auto')
+			}
 			cache.update(this, k, name[k])
+		}
 	}
 	else
 		throw new Error('cache is write-only')
 }
 
 ElementPrototype.setAttribute = function(name, value) {
-	this.dom.setAttribute(name, value)
+	return this.dom.setAttribute(name, value)
+}
+
+ElementPrototype.getAttribute = function(name) {
+	return this.dom.getAttribute(name)
+}
+
+ElementPrototype.setProperty = function(name, value) {
+	return this.dom[name] = value
+}
+
+ElementPrototype.getProperty = function(name) {
+	return this.dom[name]
 }
 
 /** @const */
@@ -352,8 +396,10 @@ ElementPrototype.updateStyle = function(updated) {
 	}
 
 	var styles = updated.data
+	var elementStyle = element.style
 
-	var rules = []
+	//fixme: classifier is currently broken, restore rules processor
+	//var rules = []
 	for(var name in styles) {
 		var value = styles[name]
 		//log('updateStyle', this._uniqueId, name, value)
@@ -363,18 +409,16 @@ ElementPrototype.updateStyle = function(updated) {
 		if (Array.isArray(value))
 			value = value.join(',')
 
-		var unit = ''
 		if (typeof value === 'number') {
-			if (name in cssUnits)
-				unit = cssUnits[name]
-			if (name === 'width')
-				value += this._widthAdjust
+			var unit = cssUnits[name]
+			if (unit !== undefined) {
+				value += unit
+			}
 		}
-		value += unit
 
-		element.style[ruleName] = value
+		elementStyle[ruleName] = value
 	}
-
+/*
 	var cache = this._context._styleClassifier
 	var cls = cache? cache.classify(rules): ''
 	if (cls !== this._class) {
@@ -385,6 +429,7 @@ ElementPrototype.updateStyle = function(updated) {
 		if (cls !== '')
 			classList.add(cls)
 	}
+*/
 }
 
 ElementPrototype.append = function(el) {
@@ -400,6 +445,24 @@ ElementPrototype.remove = function() {
 	var dom = this.dom
 	if (dom.parentNode)
 		dom.parentNode.removeChild(dom)
+}
+
+ElementPrototype.focus = function() {
+	var dom = this.dom
+	dom.focus()
+	dom.select()
+}
+
+ElementPrototype.blur = function() {
+	this.dom.blur()
+}
+
+ElementPrototype.getScrollX = function() {
+	return this.dom.scrollLeft
+}
+
+ElementPrototype.getScrollY = function() {
+	return this.dom.scrollTop
 }
 
 exports.Document = function(context, dom) {
@@ -435,6 +498,8 @@ WindowPrototype.height = function() {
 WindowPrototype.scrollY = function() {
 	return this.dom.scrollY
 }
+
+WindowPrototype.style = function() { /* ignoring style on window */ }
 
 exports.getElement = function(ctx, tag) {
 	var tags = document.getElementsByTagName(tag)
@@ -502,17 +567,31 @@ exports.init = function(ctx) {
 
 	var onFullscreenChanged = function(e) {
 		var state = document.fullScreen || document.mozFullScreen || document.webkitIsFullScreen;
+		log('fullscreen change event:', state)
 		ctx.fullscreen = state
 	}
 
-	new Array('webkitfullscreenchange', 'mozfullscreenchange', 'fullscreenchange').forEach(function(name) {
-		div.on(name, onFullscreenChanged)
+	new Array('webkitfullscreenchange', 'mozfullscreenchange', 'fullscreenchange', 'MSFullscreenChange').forEach(function(name) {
+		div.on(name, onFullscreenChanged, true)
 	})
 
-	win.on('keydown', function(event) {
-		if (ctx.processKey(event))
-			event.preventDefault()
-	}) //fixme: add html.Document instead
+	win.on('keydown', ctx.wrapNativeCallback(function(event) {
+		var keyCode = event.which || event.keyCode
+		var key = $core.keyCodes[keyCode]
+
+		if (key !== undefined) {
+			if (ctx.processKey(key, event))
+				event.preventDefault()
+		} else {
+			log("unhandled keycode " + keyCode + ": [" + event.charCode + " " + event.keyCode + " " + event.which + " " + event.key + " " + event.code + " " + event.location + "]")
+		}
+
+	})) //fixme: add html.Document instead
+	win.on('orientationchange', function(event) {
+		log('orientation changed event')
+		ctx.system.screenWidth = window.screen.width
+		ctx.system.screenHeight = window.screen.height
+	})
 
 	ctx._styleClassifier = $manifest$cssAutoClassificator? new StyleClassifier(ctx._prefix): null; //broken beyond repair
 }
@@ -555,6 +634,30 @@ var updateImage = function(image, metrics) {
 		image.paintedHeight = image.height
 	}
 
+	switch(image.horizontalAlignment) {
+		case ImageComponent.AlignHCenter:
+			style['background-position-x'] = 'center'
+			break;
+		case ImageComponent.AlignLeft:
+			style['background-position-x'] = 'left'
+			break;
+		case ImageComponent.AlignRight:
+			style['background-position-x'] = 'right'
+			break;
+	}
+
+	switch(image.verticalAlignment) {
+		case ImageComponent.AlignVCenter:
+			style['background-position-y'] = 'center'
+			break;
+		case ImageComponent.AlignTop:
+			style['background-position-y'] = 'top'
+			break;
+		case ImageComponent.AlignBottom:
+			style['background-position-y'] = 'bottom'
+			break;
+	}
+
 	switch(image.fillMode) {
 		case ImageComponent.Stretch:
 			style['background-repeat'] = 'no-repeat'
@@ -574,7 +677,6 @@ var updateImage = function(image, metrics) {
 			break;
 		case ImageComponent.PreserveAspectCrop:
 			style['background-repeat'] = 'no-repeat'
-			style['background-position'] = 'center'
 			style['background-size'] = 'cover'
 			break;
 		case ImageComponent.Pad:
@@ -584,7 +686,6 @@ var updateImage = function(image, metrics) {
 			break;
 		case ImageComponent.PreserveAspectFit:
 			style['background-repeat'] = 'no-repeat'
-			style['background-position'] = 'center'
 			style['background-size'] = 'contain'
 			var w = image.width, h = image.height
 			var targetRatio = 0, srcRatio = natW / natH
@@ -700,23 +801,37 @@ exports.layoutText = function(text) {
 		text.style({ 'height': 'auto', 'padding-top': 0})
 
 	//this is the source of rounding error. For instance you have 186.3px wide text, this sets width to 186px and causes wrapping
-	text.paintedWidth = element.fullWidth()
-	text.paintedHeight = element.fullHeight()
+	/*
+		https://github.com/pureqml/qmlcore/issues/176
 
-	//this makes style to adjust width (by adding this value), and return back _widthAdjust less
-	element._widthAdjust = 1
+		A few consequent text layouts may result in different results,
+		probably as a result of some randomisation and/or rounding errors.
+		This ends with +1 -1 +1 -1 infinite loop of updates.
+
+		Ignore all updates which subtract 1 from paintedWidth/Height
+	*/
+	var w = element.fullWidth() + 1, h = element.fullHeight() + 1
+	if (w + 1 !== text.paintedWidth)
+		text.paintedWidth = w
+	if (h + 1 !== text.paintedHeight)
+		text.paintedHeight = h
 
 	var style
 	if (!wrap)
-		style = { width: text.width, height: text.height } //restore original width value (see 'if' above)
+		//restore original width value (see 'if' above), we're not passing 'height' as it's explicitly set by layoutTextSetStyles
+		style = { 'width': text.width }
 	else
-		style = {'height': text.height }
+		style = { }
 
 	layoutTextSetStyle(text, style)
 	element.appendChildren(removedChildren)
 }
 
 exports.run = function(ctx, onloadCallback) {
+	ctx.window.on('message', function(event) {
+		log('Context: received message from ' + event.origin, event)
+		ctx.message(event)
+	})
 	ctx.window.on($manifest$expectRunContextEvent ? 'runContext' : 'load', function() {
 		onloadCallback()
 	})
@@ -815,3 +930,70 @@ exports.cancelAnimationFrame = Modernizr.prefixed('cancelAnimationFrame', window
 exports.enterFullscreenMode = function(el) { return Modernizr.prefixed('requestFullscreen', el.dom)() }
 exports.exitFullscreenMode = function() { return window.Modernizr.prefixed('exitFullscreen', document)() }
 exports.inFullscreenMode = function () { return !!window.Modernizr.prefixed('fullscreenElement', document) }
+
+exports.ajax = function(ui, request) {
+	var url = request.url
+	var error = request.error,
+		headers = request.headers,
+		done = request.done,
+		settings = request.settings
+
+	var xhr = new XMLHttpRequest()
+
+	if (error)
+		xhr.addEventListener('error', error)
+
+	if (done)
+		xhr.addEventListener('load', done)
+
+	xhr.open(request.method || 'GET', url);
+
+	for (var i in settings)
+		xhr[i] = settings[i]
+
+	for (var i in headers)
+		xhr.setRequestHeader(i, headers[i])
+
+	if (request.data)
+		xhr.send(request.data)
+	else
+		xhr.send()
+}
+
+exports.fingerprint = function(ctx, fingerprint) {
+	var html = exports
+	try {
+		var fcanvas = html.createElement(ctx, 'canvas')
+		var w = 2000, h = 32
+		fcanvas.dom.width = w
+		fcanvas.dom.height = h
+		var txt = "ABCDEFGHIJKLMNOPQRSTUVWXYZ /0123456789 abcdefghijklmnopqrstuvwxyz £©µÀÆÖÞßéöÿ –—‘“”„†•…‰™œŠŸž€ ΑΒΓΔΩαβγδω АБВГДабвгд ∀∂∈ℝ∧∪≡∞ ↑↗↨↻⇣ ┐┼╔╘░►☺♀ ﬁ�⑀₂ἠḂӥẄɐː⍎אԱა"
+		var fctx = fcanvas.dom.getContext('2d')
+		fctx.textBaseline = "top";
+		fctx.font = "20px 'Arial'";
+		fctx.textBaseline = "alphabetic";
+		fctx.fillStyle = "#fedcba";
+		fctx.fillRect(0, 0, w, h);
+		fctx.fillStyle = "#12345678";
+		fctx.fillText(txt, 1.5, 23.5, w);
+		fctx.font = "19.5px 'Arial'";
+		fctx.fillStyle = "#789abcde";
+		fctx.fillText(txt, 1, 22, w);
+		fingerprint.update(fcanvas.dom.toDataURL())
+	} catch(ex) {
+		log('canvas test failed: ' + ex)
+	}
+	try { fingerprint.update(window.navigator.userAgent) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.navigator.plugins) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.navigator.mimeTypes) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.navigator.language) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.navigator.platform) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.navigator.product) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.navigator.productSub) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.navigator.vendorSub) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.navigator.hardwareConcurrency) } catch (ex) { log(ex) }
+
+	try { fingerprint.update(window.screen.availWidth) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.screen.availHeight) } catch (ex) { log(ex) }
+	try { fingerprint.update(window.screen.colorDepth) } catch (ex) { log(ex) }
+}

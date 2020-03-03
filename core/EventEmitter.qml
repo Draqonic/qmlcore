@@ -5,14 +5,18 @@ CoreObject {
 		this._onConnections = []
 	}
 
-	function discard() {
-		for(var name in this._eventHandlers)
-			this.removeAllListeners(name)
-
+	/// @private removes all on(signal) connections
+	function removeAllOn() {
 		var connections = this._onConnections
 		for(var i = 0, n = connections.length; i < n; i += 3)
 			connections[i].removeListener(connections[i + 1], connections[i + 2])
 		this._onConnections = []
+	}
+
+	function discard() {
+		this.removeAllOn()
+		for(var name in this._eventHandlers)
+			this.removeAllListeners(name)
 	}
 
 	function on (name, callback) {
@@ -45,7 +49,7 @@ CoreObject {
 
 		COPY_ARGS(args, 1)
 
-		var invoker = _globals.core.safeCall(
+		var invoker = $core.safeCall(
 			this, args,
 			function(ex) { log("event/signal " + name + " handler failed:", ex, ex.stack) }
 		)
@@ -67,7 +71,7 @@ CoreObject {
 		if (proto_callback === undefined && handlers === undefined)
 			return
 
-		var invoker = _globals.core.safeCall(
+		var invoker = $core.safeCall(
 			this, args,
 			function(ex) { log("event/signal " + name + " handler failed:", ex, ex.stack) }
 		)

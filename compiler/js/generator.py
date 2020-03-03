@@ -1,10 +1,15 @@
+from __future__ import print_function
+from builtins import object
+
 import json
 import re
-from compiler.js import split_name, escape_package, get_package
+from compiler.js import split_name, escape_package, get_package, mangle_package, escape
 from compiler.js.component import component_generator
 from collections import OrderedDict
 
-root_type = 'core.CoreObject'
+root_type_package = 'core'
+root_type_name = 'CoreObject'
+root_type = root_type_package + '.' + root_type_name
 
 class generator(object):
 	def __init__(self, ns, bid):
@@ -27,7 +32,7 @@ class generator(object):
 		package = escape_package(package)
 
 		if not declaration:
-			name = "%s.Ui%s" %(package, component_name[0].upper() + component_name[1:])
+			name = "%s.Ui%s" %(package, component_name[0].upper() + escape(component_name[1:]))
 			self.used_components.add(name)
 			self.used_packages.add(package)
 			self.startup.append("\tcontext.start(new qml.%s(context))" %name)
@@ -48,17 +53,23 @@ class generator(object):
 		self.imports[name] = data
 
 	def wrap(self, code, use_globals = False):
-		return "(function() {/** @const */\nvar exports = %s;\nexports._get = function(name) { return exports[name] }\n%s\nreturn exports;\n} )" %("_globals" if use_globals else "{}", code)
+		return "(function() {/** @const */\nvar exports = %s;\n%s\nreturn exports;\n} )" %("_globals" if use_globals else "{}", code)
 
-	def find_component(self, package, name, register_used = True):
-		if name == "CoreObject":
-			return root_type
+	def find_component(self, package, name, register_used = True, mangle = False, use_globals = False):
+		if name == root_type_name:
+			package = root_type_package
+			#fixme: copypasted
+			if mangle:
+				package = mangle_package(root_type_package)
+			if use_globals:
+				package = "_globals." + package
+			return package + "." + root_type_name
 
 		original_name = name
 		name_package, name = split_name(name)
 
 		candidates = []
-		for package_name, components in self.packages.iteritems():
+		for package_name, components in self.packages.items():
 			if name in components:
 				if name_package:
 					#match package/subpackage
@@ -78,12 +89,17 @@ class generator(object):
 				package_name = 'core'
 			else:
 				raise Exception("ambiguous component %s, you have to specify one of the packages explicitly: %s" \
-					%(name, " ".join(map(lambda p: "%s.%s" %(p, name), candidates))))
+					%(name, " ".join(["%s.%s" %(p, name) for p in candidates])))
 		else:
 			package_name = candidates[0]
 
 		if register_used:
 			self.used_components.add(package_name + '.' + name)
+
+		if mangle:
+			package_name = mangle_package(package_name)
+		if use_globals:
+			package_name = "_globals." + package_name
 		return "%s.%s" %(package_name, name)
 
 	def generate_component(self, gen):
@@ -110,7 +126,7 @@ class generator(object):
 
 	def generate_components(self):
 		#finding explicit @using declarations in code
-		for name, code in self.imports.iteritems():
+		for name, code in self.imports.items():
 			self.scan_using(code)
 
 		context_type = self.find_component('core', 'Context')
@@ -118,15 +134,14 @@ class generator(object):
 		for i, pi in enumerate(context_gen.properties):
 			for j, nv in enumerate(pi.properties):
 				if nv[0] == 'buildIdentifier':
-					bid = '"' + self.bid + '"'
-					pi.properties[j] = (nv[0], bid.encode('utf-8'))
+					pi.properties[j] = (nv[0], self.bid)
 					break
 
 		queue = ['core.Context']
 		code, base_class = {}, {}
 		code[root_type] = ''
 
-		for gen in self.components.itervalues():
+		for gen in self.components.values():
 			gen.pregenerate(self)
 
 		while queue or self.used_components:
@@ -154,16 +169,16 @@ class generator(object):
 			order.append(type)
 			visited.add(type)
 
-		for type in base_class.iterkeys():
+		for type in base_class.keys():
 			visit(type)
 
 		for type in order:
-			r += code[type].decode('utf-8')
+			r += code[type]
 
 		return r
 
 	def generate_prologue(self):
-		for name in self.imports.iterkeys():
+		for name in self.imports.keys():
 			self.used_packages.add(get_package(name))
 
 		r = []
@@ -178,11 +193,12 @@ class generator(object):
 
 		path = "_globals"
 		def check(path, packages):
-			for ns in packages.iterkeys():
+			for ns in packages.keys():
 				if not ns:
 					raise Exception('internal bug, empty name in packages')
 				package = escape_package(path + "." + ns)
 				r.append("if (!%s) /** @const */ %s = {}" %(package, package))
+				r.append("var %s = %s" %(mangle_package(package), package))
 				check(package, packages[ns])
 		check(path, packages)
 
@@ -196,14 +212,14 @@ class generator(object):
 		if safe_name.endswith(".js"):
 			safe_name = safe_name[:-3]
 		safe_name = escape_package(safe_name.replace('/', '.'))
-		code = "//=====[import %s]=====================\n\n" %name + code.decode('utf-8')
+		code = "//=====[import %s]=====================\n\n" %name + code
 		r.append("_globals.%s = %s()" %(safe_name, self.wrap(code, name == "core.core"))) #hack: core.core use _globals as its exports
 		return "\n".join(r)
 
 
 	def generate_imports(self):
 		r = ''
-		for name, code in self.imports.iteritems():
+		for name, code in self.imports.items():
 			if name != 'core.core':
 				r += self.generate_import(name, code) + '\n'
 		return r
@@ -264,8 +280,7 @@ class generator(object):
 		r = ""
 		if self.module:
 			r += "module.exports = %s\n" %ns
-			r += "module.exports.run = function(nativeContext) { "
-		r += "try {\n"
+			r += "module.exports.run = function(nativeContext) {\n"
 
 		context_type = self.find_component('core', 'Context')
 
@@ -275,9 +290,9 @@ class generator(object):
 		startup.append('\tcontext.init()')
 		startup += self.startup
 		r += "\n".join(startup)
-		r += "\n} catch(ex) { log(\"%s initialization failed: \", ex, ex.stack) }\n" %ns
+		r += "\n"
 		if self.module:
-			r += "return context\n"
+			r += "\treturn context\n"
 			r += "}"
 		return r
 
@@ -286,7 +301,7 @@ class generator(object):
 		ts = Ts(path)
 		lang = ts.language
 		if lang is None: #skip translation without target language (autogenerated base)
-			print 'WARNING: no language in %s, translation ignored' %path
+			print('WARNING: no language in %s, translation ignored' %path)
 			return
 		data = {}
 		for ctx in ts:

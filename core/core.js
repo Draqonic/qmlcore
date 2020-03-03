@@ -1,8 +1,8 @@
 //WARNING: no log() function usage before init.js
 
-exports.core.device = 0
-exports.core.vendor = ""
-exports.core.__videoBackends = {}
+$core.device = 0
+$core.vendor = ""
+$core.__videoBackends = {}
 
 /* ${init.js} */
 
@@ -42,10 +42,6 @@ if (!Function.prototype.bind) {
 
 if (log === null)
 	log = console.log.bind(console)
-
-/** @const */
-/** @param {string} text @param {...} args */
-_globals.qsTr = function(text, args) { return _globals._context.qsTr.apply(qml._context, arguments) }
 
 var colorTable = {
 	'aliceblue':			'f0f8ff',
@@ -207,18 +203,30 @@ exports.core.safeCall = function(self, args, onError) {
 	return function(callback) { return safeCallImpl(callback, self, args, onError) }
 }
 
+exports.core.assign = function(target, path, value) {
+	var path = path.split('.')
+	var n = path.length - 1
+	for(var i = 0; i < n; ++i) {
+		target = target[path[i]]
+	}
+	target[path[n]] = value
+}
 
-exports.core.getKeyCodeByName = function(key) {
-	var codes = _globals.core.keyCodes
+$core.getKeyCodeByName = function(key) {
+	var codes = $core.keyCodes
 	for (var i in codes) {
 		if (codes[i] === key)
 			return ~~i
 	}
 }
+
+/* @const @type {!$core.CoreObject} */
+
 /**
  * @constructor
  */
-var CoreObjectComponent = exports.core.CoreObject = function(parent) {
+
+var CoreObjectComponent = $core.CoreObject = function(parent) {
 	this._local = Object.create(parent? parent._local: null)
 }
 
@@ -236,10 +244,11 @@ CoreObjectComponentPrototype.__init = function() {
 	var c = {}
 	this.$c(c)
 	this.$s(c)
+	this.completed()
 }
 
 /** @private **/
-CoreObjectComponentPrototype.__complete = function() { }
+CoreObjectComponentPrototype.__complete = function() { /*do not add anything here, it must be empty (empty onCompleted optimisation)*/ }
 
 ///@private gets object by id
 CoreObjectComponentPrototype._get = function(name, unsafe) {
@@ -256,7 +265,7 @@ CoreObjectComponentPrototype._get = function(name, unsafe) {
 }
 
 /** @constructor */
-var Color = exports.core.Color = function(value) {
+var Color = $core.Color = function(value) {
 	if (Array.isArray(value)) {
 		this.r = value[0]
 		this.g = value[1]
@@ -337,7 +346,7 @@ Color.normalize = function(spec) {
 }
 
 var ColorPrototype = Color.prototype
-ColorPrototype.constructor = exports.core.Color
+ColorPrototype.constructor = $core.Color
 /** @const */
 
 ColorPrototype.rgba = function() {
@@ -362,14 +371,15 @@ ColorPrototype.ahex = function() {
 
 exports.addLazyProperty = function(proto, name, creator) {
 	var get = function(object) {
-		var storage = object.__properties[name]
+		var properties = object.__properties
+		var storage = properties[name]
 		if (storage !== undefined) {
 			if (storage.value === undefined)
 				storage.value = creator(object)
 			return storage
 		}
 
-		return object.__properties[name] = new PropertyStorage(creator(object))
+		return properties[name] = new PropertyStorage(creator(object))
 	}
 
 	Object.defineProperty(proto, name, {
@@ -411,47 +421,50 @@ var PropertyStoragePrototype = PropertyStorage.prototype
 
 PropertyStoragePrototype.getAnimation = function(name, animation) {
 	var a = this.animation
-	if (!a || !a.enabled() || a._native)
-		return null
-	if (!a._context._completed)
-		return null
-	return a
+	return a && a.enabled() && !a._native && a._context._completed? a: null
 }
 
-PropertyStoragePrototype.removeUpdater = function() {
-	var callback = this.callback
-	if (callback === undefined)
-		return
-
+PropertyStoragePrototype.__removeUpdater = function(callback) {
 	var deps = this.deps
 	for(var i = 0, n = deps.length; i < n; i += 2) {
 		var object = deps[i]
 		var name = deps[i + 1]
 		object.removeOnChanged(name, callback)
 	}
-	this.deps = this.callback = undefined
+}
+
+PropertyStoragePrototype.removeUpdater = function() {
+	var oldCallback = this.callback
+	if (oldCallback !== undefined) {
+		this.__removeUpdater(oldCallback)
+		this.deps = this.callback = undefined
+	}
 }
 
 PropertyStoragePrototype.replaceUpdater = function(parent, callback, deps) {
-	this.removeUpdater()
+	var oldCallback = this.callback
+	if (oldCallback !== undefined)
+		this.__removeUpdater(oldCallback)
+
 	this.callback = callback
 	this.deps = deps
+	var connectOnChanged = parent.connectOnChanged
 	for(var i = 0, n = deps.length; i < n; i += 2) {
 		var object = deps[i]
 		var name = deps[i + 1]
-		parent.connectOnChanged(object, name, callback)
+		connectOnChanged.call(parent, object, name, callback)
 	}
 	callback()
 }
 
 PropertyStoragePrototype.forwardSet = function(object, name, newValue, defaultValue) {
-	var forwardTarget = this.forwardTarget
-	if (forwardTarget === undefined)
-		return false
-
 	var oldValue = this.getCurrentValue(defaultValue)
 	if (oldValue !== null && (oldValue instanceof Object)) {
 		//forward property update for mixins
+		var forwardTarget = oldValue.defaultProperty
+		if (forwardTarget === undefined)
+			return false
+
 		var forwardedOldValue = oldValue[forwardTarget]
 		if (newValue !== forwardedOldValue) {
 			oldValue[forwardTarget] = newValue
@@ -460,6 +473,10 @@ PropertyStoragePrototype.forwardSet = function(object, name, newValue, defaultVa
 		return true
 	} else if (newValue instanceof Object) {
 		//first assignment of mixin
+		var forwardTarget = newValue.defaultProperty
+		if (forwardTarget === undefined)
+			return false
+
 		object.connectOnChanged(newValue, forwardTarget, function(v, ov) {
 			var storage = object.__properties[name]
 			if (storage !== undefined)
@@ -505,23 +522,25 @@ PropertyStoragePrototype.set = function(object, name, newValue, defaultValue, ca
 		this.callOnChanged(object, name, newValue, oldValue)
 }
 
-PropertyStoragePrototype.callOnChanged = function(object, name, value) {
+var _callOnChanged = function(object, name, value, handlers) {
 	var protoCallbacks = object['__changed__' + name]
-	var handlers = this.onChanged
-
 	var hasProtoCallbacks = protoCallbacks !== undefined
 	var hasHandlers = handlers !== undefined
 
 	if (!hasProtoCallbacks && !hasHandlers)
 		return
 
-	var invoker = _globals.core.safeCall(object, [value], function(ex) { log("on " + name + " changed callback failed: ", ex, ex.stack) })
+	var invoker = $core.safeCall(object, [value], function(ex) { log("on " + name + " changed callback failed: ", ex, ex.stack) })
 
 	if (hasProtoCallbacks)
 		protoCallbacks.forEach(invoker)
 
 	if (hasHandlers)
 		handlers.forEach(invoker)
+}
+
+PropertyStoragePrototype.callOnChanged = function(object, name, value) {
+	_callOnChanged(object, name, value, this.onChanged)
 }
 
 PropertyStoragePrototype.removeOnChanged = function(callback) {
@@ -531,42 +550,69 @@ PropertyStoragePrototype.removeOnChanged = function(callback) {
 		return handlers.splice(idx, 1)
 }
 
-exports.addProperty = function(proto, type, name, defaultValue) {
-	var convert
-	var animable = false
+var getDefaultValueForType = exports.getDefaultValueForType = function(type) {
+	switch(type) {
+		case 'enum': //fixme: add default value here
+		case 'int':		return 0
+		case 'bool':	return false
+		case 'real':	return 0.0
+		case 'string':	return ""
+		case 'array':	return []
+		case 'Color':	return '#0000'
+		default:		return (type[0].toUpperCase() === type[0])? null: undefined
+	}
+}
+
+var convertTo = exports.convertTo = function(type, value) {
 	switch(type) {
 		case 'enum':
-		case 'int':		convert = function(value) { return ~~value }; animable = true; break
-		case 'bool':	convert = function(value) { return value? true: false }; break
-		case 'real':	convert = function(value) { return +value }; animable = true; break
-		case 'string':	convert = function(value) { return String(value) }; break
-
-		case 'Color':	animable = true; //fallthrough
-		default:		convert = function(value) { return value }; break
+		case 'int':		return ~~value
+		case 'bool':	return value? true: false
+		case 'real':	return +value
+		case 'string':	return String(value)
+		default:		return value
 	}
+}
+
+var getConvertFunction = exports.getConvertFunction = function(type) {
+	switch(type) {
+		case 'enum':
+		case 'int':		return function(value) { return ~~value }
+		case 'bool':	return function(value) { return value? true: false }
+		case 'real':	return function(value) { return +value }
+		case 'string':	return function(value) { return String(value) }
+		default:		return function(value) { return value }
+	}
+}
+
+var isTypeAnimable = function(type) {
+	switch(type) {
+		case 'int':
+		case 'real':
+		case 'Color':
+			return true;
+		default:
+			return false;
+	}
+}
+
+exports.addProperty = function(proto, type, name, defaultValue) {
+	var convert = getConvertFunction(type)
+	var animable = isTypeAnimable(type)
 
 	if (defaultValue !== undefined) {
 		defaultValue = convert(defaultValue)
 	} else {
-		switch(type) {
-			case 'enum': //fixme: add default value here
-			case 'int':		defaultValue = 0; break
-			case 'bool':	defaultValue = false; break
-			case 'real':	defaultValue = 0.0; break
-			case 'string':	defaultValue = ""; break
-			case 'array':	defaultValue = []; break
-			case 'Color':	defaultValue = '#0000'; break
-			default:
-				defaultValue = (type[0].toUpperCase() == type[0])? null: undefined
-		}
+		defaultValue = getDefaultValueForType(type)
 	}
 
 	var createStorage = function(newValue) {
-		var storage = this.__properties[name]
+		var properties = this.__properties
+		var storage = properties[name]
 		if (storage === undefined) { //no storage
-			if (newValue === defaultValue) //value == defaultValue, no storage allocation
+			if (newValue === defaultValue) //value === defaultValue, no storage allocation
 				return
-			storage = this.__properties[name] = new PropertyStorage(defaultValue)
+			storage = properties[name] = new PropertyStorage(defaultValue)
 		}
 		return storage
 	}
@@ -617,9 +663,9 @@ exports.addProperty = function(proto, type, name, defaultValue) {
 				backend.cancelAnimationFrame(storage.frameRequest)
 				storage.frameRequest = undefined
 				animation.complete = function() { }
-				animation.running = false
 				storage.interpolatedValue = undefined
 				storage.started = undefined
+				animation.running = false
 				storage.callOnChanged(self, name, dst, src)
 			}
 
@@ -660,6 +706,8 @@ exports.addAliasProperty = function(object, name, getObject, srcProperty) {
 		var storage = object.__properties[name]
 		if (storage !== undefined)
 			storage.callOnChanged(object, name, value)
+		else
+			_callOnChanged(object, name, value) //call prototype handlers
 	})
 
 	Object.defineProperty(object, name, {
@@ -669,25 +717,25 @@ exports.addAliasProperty = function(object, name, getObject, srcProperty) {
 	})
 }
 
-exports.core.createSignal = function(name) {
+$core.createSignal = function(name) {
 	return function() {
 		this.emitWithArgs(name, arguments)
 	}
 }
-exports.core.createSignalForwarder = function(object, name) {
+$core.createSignalForwarder = function(object, name) {
 	return (function() {
 		object.emitWithArgs(name, arguments)
 	})
 }
 
 /** @constructor */
-exports.core.EventBinder = function(target) {
+$core.EventBinder = function(target) {
 	this.target = target
 	this.callbacks = {}
 	this.enabled = false
 }
 
-exports.core.EventBinder.prototype.on = function(event, callback) {
+$core.EventBinder.prototype.on = function(event, callback) {
 	if (event in this.callbacks)
 		throw new Error('double adding of event (' + event + ')')
 	this.callbacks[event] = callback
@@ -695,9 +743,9 @@ exports.core.EventBinder.prototype.on = function(event, callback) {
 		this.target.on(event, callback)
 }
 
-exports.core.EventBinder.prototype.constructor = exports.core.EventBinder
+$core.EventBinder.prototype.constructor = $core.EventBinder
 
-exports.core.EventBinder.prototype.enable = function(value) {
+$core.EventBinder.prototype.enable = function(value) {
 	if (value != this.enabled) {
 		var target = this.target
 		this.enabled = value
@@ -712,7 +760,7 @@ exports.core.EventBinder.prototype.enable = function(value) {
 }
 
 var protoEvent = function(prefix, proto, name, callback) {
-	var sname = prefix + '__' + name
+	var sname = prefix + name
 	//if property was in base prototype, create shallow copy and put our handler there or we would add to base prototype's array
 	var storage = proto[sname]
 	if (storage !== undefined) {
@@ -728,14 +776,14 @@ var protoEvent = function(prefix, proto, name, callback) {
 		proto[sname] = [callback]
 }
 
-exports.core._protoOn = function(proto, name, callback)
-{ protoEvent('__on', proto, name, callback) }
+$core._protoOn = function(proto, name, callback)
+{ protoEvent('__on__', proto, name, callback) }
 
-exports.core._protoOnChanged = function(proto, name, callback)
-{ protoEvent('__changed', proto, name, callback) }
+$core._protoOnChanged = function(proto, name, callback)
+{ protoEvent('__changed__', proto, name, callback) }
 
-exports.core._protoOnKey = function(proto, name, callback)
-{ protoEvent('__key', proto, name, callback) }
+$core._protoOnKey = function(proto, name, callback)
+{ protoEvent('__key__', proto, name, callback) }
 
 var ObjectEnumerator = function(callback) {
 	this._callback = callback
@@ -789,3 +837,12 @@ String.prototype.arg = function (arg) {
 };
 
 Array.prototype.__defineGetter__("count", function() { return this.length })
+
+exports.createObject = function(item) {
+	item.__init()
+	var parent = item.parent
+	parent._updateVisibilityForChild(item, parent.recursiveVisible)
+	if ('_tryFocus' in parent)
+		parent._tryFocus()
+	item._context.scheduleComplete()
+}

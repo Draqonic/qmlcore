@@ -1,3 +1,5 @@
+from builtins import map
+
 import re
 
 def split_name(name):
@@ -21,8 +23,15 @@ def escape_id(name):
 
 def escape_package(name):
 	package = name.split('.')
-	package = map(escape_id, package)
-	return ".".join(package)
+	return ".".join(map(escape_id, package))
+
+def mangle_package(name):
+	package = name.split('.')
+	package = list(map(escape_id, package))
+	if package[0] == '_globals':
+		package.pop(0)
+	package = [''] + package
+	return "$".join(package)
 
 from compiler.js.component import component_generator
 from compiler.js.generator import generator

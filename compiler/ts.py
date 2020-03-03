@@ -1,3 +1,6 @@
+from builtins import object, str
+from past.builtins import cmp
+
 import os
 import re
 import xml.etree.ElementTree as ET
@@ -14,7 +17,7 @@ def scan(text, file = ''):
 		args = m.group(2)
 		m = q1_re.match(args) or q2_re.match(args)
 		if m:
-			locs.append((type, m.group(1).decode('utf-8'), m.pos))
+			locs.append((type, m.group(1), m.pos))
 	return locs
 
 class Location(object):
@@ -87,7 +90,7 @@ class Context(object):
 		return cmp(self.name, o.name)
 
 	def __iter__(self):
-		return self.__messages.itervalues()
+		return iter(self.__messages.values())
 
 	def add(self, src, loc):
 		if src in self.__messages:
@@ -115,20 +118,20 @@ class Context(object):
 		ctx = ET.SubElement(parent, 'context')
 		name = ET.SubElement(ctx, 'name')
 		name.text = self.name
-		for msg in sorted(self.__messages.itervalues()):
+		for msg in sorted(self.__messages.values()):
 			msg.save(ctx)
 
 class Ts(object):
-	def __init__(self, path = ''):
+	def __init__(self, path = '', lang = None):
 		self.__file = path
 		self.__contexts = {}
 		self.version = None
-		self.language = None
+		self.language = lang
 		if os.path.exists(path):
 			self._load(path)
 
 	def __iter__(self):
-		return self.__contexts.itervalues()
+		return iter(self.__contexts.values())
 
 	def _load(self, path):
 		tree = ET.parse(path)
@@ -148,7 +151,7 @@ class Ts(object):
 		if self.language:
 			root.attrib['language'] = self.language
 
-		for ctx in sorted(self.__contexts.itervalues()):
+		for ctx in sorted(self.__contexts.values()):
 			ctx.save(root)
 
 		rough_string = ET.tostring(root, 'utf-8')
@@ -172,7 +175,7 @@ class Ts(object):
 	def scan(self, dirs):
 		for directory in dirs:
 			for dirpath, dirname, files in os.walk(directory):
-				dirname[:] = filter(lambda name: name[0] != '.' and not name.startswith('qmlcore'), dirname)
+				dirname[:] = [name for name in dirname if name[0] != '.' and not name.startswith('qmlcore')]
 
 				for file in files:
 					basename, ext = os.path.splitext(file)

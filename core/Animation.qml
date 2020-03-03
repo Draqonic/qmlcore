@@ -8,6 +8,10 @@ Object {
 	property bool cssTransition: true;		///< use css transition if possible
 	property bool running: false;			///< currently running
 	property string easing: "ease";			///< easing function
+	property Object target;					///< target object
+	property string property;				///< target object property
+	property variant from;					///< used in declarative animation inside SequentialAnimation, starting value
+	property variant to;					///< used in declarative animation inside SequentialAnimation, destination value
 
 	constructor:	{ this._disabled = 0; this._native = false }
 	/// disable animation.
@@ -15,7 +19,7 @@ Object {
 	/// enable animation.
 	enable:			{ --this._disabled; this._updateAnimation() }
 	/// returns true if animation is enabled
-	enabled:		{ return this._disabled == 0 }
+	enabled:		{ return this._disabled === 0 }
 
 	/// @private
 	onDelayChanged,
@@ -29,8 +33,8 @@ Object {
 	}
 
 	function _updateAnimation() {
-		if (this._target)
-			this._target.updateAnimation(this._property, this)
+		if (this.target)
+			this.target.updateAnimation(this.property, this)
 	}
 
 	/// @private

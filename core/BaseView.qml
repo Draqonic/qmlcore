@@ -9,7 +9,7 @@ BaseLayout {
 	property int animationDuration: 0;
 	property string animationEasing: "ease";
 	property bool contentFollowsCurrentItem: true;	///< auto-scroll content to current focused item
-	property bool nativeScrolling;	///< allows native scrolling on mobile targets and shows native scrollbars
+	property bool nativeScrolling: context.system.device === context.system.Mobile; ///< allows native scrolling on mobile targets and shows native scrollbars
 	property real prerender: 0.5;	///< allocate additional delegates by viewport (prerender * horizontal/vertical view size) px
 	property enum positionMode		{ Contain, Beginning, Center, End, Visible, Page }; ///< position mode for auto-scrolling/position methods
 	property string visibilityProperty; ///< if this property is false, delegate is not created at all
@@ -20,6 +20,8 @@ BaseLayout {
 
 	/// @internal
 	property BaseViewContent content: BaseViewContent {
+		cssTranslatePositioning: parent.cssTranslatePositioning;
+
 		Behavior on x, y, transform { Animation { duration: parent.parent.animationDuration; easing: parent.parent.animationEasing; } }
 	}
 
@@ -29,7 +31,7 @@ BaseLayout {
 	/// @private
 	constructor: {
 		this._items = []
-		this._modelUpdate = new _globals.core.model.ModelUpdate()
+		this._modelUpdate = new $core.model.ModelUpdate()
 		this._attached = null
 
 		//callback instances for dynamic model subscriptions
@@ -48,7 +50,7 @@ BaseLayout {
 	/// @private focuses current item
 	function focusCurrent() {
 		var n = this.count
-		if (n == 0)
+		if (n === 0)
 			return
 
 		var idx = this.currentIndex
@@ -133,18 +135,18 @@ BaseLayout {
 		if (this.trace)
 			log('attaching model...')
 
-		var Model = _globals.core.Model
+		var Model = $core.Model
 		var model = this.model
 		var modelType = typeof model
 
 		if ((Model !== undefined) && (model instanceof Model)) {
 		} else if (Array.isArray(model)) {
-			model = new _globals.core.model.ArrayModelWrapper(model)
+			model = new $core.model.ArrayModelWrapper(model)
 		} else if (modelType === 'number') {
 			var data = []
 			for(var i = 0; i < model; ++i)
 				data.push({})
-			model = new _globals.core.model.ArrayModelWrapper(data)
+			model = new $core.model.ArrayModelWrapper(data)
 		} else
 			throw new Error("unknown value of type '" + (typeof model) + "', attached to model property: " + model + ((modelType === 'object') && ('componentName' in model)? ', component name: ' + model.componentName: ''))
 
@@ -180,7 +182,7 @@ BaseLayout {
 	}
 
 	/// @private creates delegate in given item slot
-	function _createDelegate(idx) {
+	function _createDelegate(idx, callback) {
 		var items = this._items
 		var item = items[idx]
 		if (item !== null && item !== undefined)
@@ -200,7 +202,11 @@ BaseLayout {
 		items[idx] = item
 		item.view = this
 		item.element.remove()
-		this.content.element.append(item.element)
+
+		if (callback === undefined)
+			this.content.element.append(item.element)
+		else
+			callback.call(this, item)
 
 		item.recursiveVisible = this.recursiveVisible && item.visible && item.visibleInView
 
@@ -231,7 +237,7 @@ BaseLayout {
 
 	function discard() {
 		this._detach()
-		_globals.core.BaseLayout.prototype.discard.apply(this)
+		$core.BaseLayout.prototype.discard.apply(this)
 	}
 
 	/// @private
@@ -296,10 +302,45 @@ BaseLayout {
 		this.content._updateScrollPositions(x, y, layout)
 	}
 
+	function positionViewAtItemHorizontally(itemBox, center, centerOversized) {
+		var cx = this.contentX, cy = this.contentY
+		var x = itemBox[0], y = itemBox[1]
+		var iw = itemBox[2], ih = itemBox[3]
+		var w = this.width, h = this.height
+
+		var atCenter = x - w / 2 + iw / 2
+		if (iw > w)
+			this.contentX = centerOversized? atCenter: x
+		else if (center && this.contentWidth > w)
+			this.contentX = atCenter < 0 ? 0 : x > this.contentWidth - w / 2 - iw / 2 ? this.contentWidth - w : atCenter
+		else if (x - cx <= 0)
+			this.contentX = x
+		else if (x - cx + iw > w)
+			this.contentX = x + iw - w
+	}
+
+	function positionViewAtItemVertically(itemBox, center, centerOversized) {
+		var cx = this.contentX, cy = this.contentY
+		var x = itemBox[0], y = itemBox[1]
+		var iw = itemBox[2], ih = itemBox[3]
+		var w = this.width, h = this.height
+
+		var atCenter = y - h / 2 + ih / 2
+		if (ih > h)
+			this.contentY = centerOversized? atCenter: y
+		else if (center && this.contentHeight > h)
+			this.contentY = atCenter < 0 ? 0 : y > this.contentHeight - h / 2 - ih / 2 ? this.contentHeight - h : atCenter
+		else if (y - cy <= 0)
+			this.contentY = y
+		else if (y - cy + ih > h)
+			this.contentY = y + ih - h
+	}
+
+
 	onCompleted: {
 		var self = this
-		this.element.on('scroll', function(event) {
-			self._updateScrollPositions(self.element.dom.scrollLeft, self.element.dom.scrollTop)
+		this.element.on('scroll', function() {
+			self._updateScrollPositions(self.element.getScrollX(), self.element.getScrollY())
 		}.bind(this))
 	}
 }

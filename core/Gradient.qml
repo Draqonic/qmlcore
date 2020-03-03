@@ -10,8 +10,8 @@ Object {
 
 	///@private
 	function addChild(child) {
-		_globals.core.Object.prototype.addChild.apply(this, arguments)
-		if (child instanceof _globals.core.GradientStop) {
+		$core.Object.prototype.addChild.apply(this, arguments)
+		if (child instanceof $core.GradientStop) {
 			this.stops.push(child)
 			this.stops.sort(function(a, b) { return a.position > b.position; })
 			this._updateStyle()
@@ -33,7 +33,7 @@ Object {
 			return
 
 		var decl = []
-		var orientation = this.orientation == this.Vertical? 'bottom': 'left'
+		var orientation = this.orientation === this.Vertical? 'bottom': 'left'
 
 		switch(this.orientation) {
 				case this.Vertical:	orientation = 'to bottom'; break

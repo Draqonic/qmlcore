@@ -13,7 +13,7 @@ Item {
 	}
 
 	onColorChanged: {
-		this.style('background-color', _globals.core.Color.normalize(value))
+		this.style('background-color', $core.Color.normalize(value))
 	}
 
 	prototypeConstructor: {

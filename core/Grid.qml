@@ -8,13 +8,13 @@ Layout {
 
 	///@private
 	onWidthChanged: {
-		if (this.flow == this.FlowTopToBottom)
+		if (this.flow === this.FlowTopToBottom)
 			this._scheduleLayout()
 	}
 
 	///@private
 	onHeightChanged: {
-		if (this.flow == this.FlowLeftToRight)
+		if (this.flow === this.FlowLeftToRight)
 			this._scheduleLayout()
 	}
 
@@ -122,7 +122,7 @@ Layout {
 		var tempRows = []
 		this._rows = []
 		rows.push({idx: 0, size: 0}) //starting value
-		var horizontal = this.flow == this.FlowLeftToRight
+		var horizontal = this.flow === this.FlowLeftToRight
 		var size = horizontal ? this.height : this.width
 		for(var i = 0; i < children.length; ++i) {
 			var c = children[i]
@@ -245,12 +245,12 @@ Layout {
 
 	///@private
 	function addChild(child) {
-		_globals.core.Item.prototype.addChild.apply(this, arguments)
-		if (child instanceof _globals.core.Item) {
+		$core.Item.prototype.addChild.apply(this, arguments)
+		if (child instanceof $core.Item) {
 			child.onChanged('height', this._scheduleLayout.bind(this))
 			child.onChanged('width', this._scheduleLayout.bind(this))
 			child.onChanged('recursiveVisible', this._scheduleLayout.bind(this))
-			child.anchors.on('marginsUpdated', this._scheduleLayout.bind(this))
+			child.on('anchorsMarginsUpdated', this._scheduleLayout.bind(this))
 		}
 	}
 

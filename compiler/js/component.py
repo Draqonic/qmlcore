@@ -1,4 +1,7 @@
-from compiler.js import get_package, split_name, escape
+from builtins import filter, object, range, str
+from past.builtins import basestring
+
+from compiler.js import get_package, split_name, escape, mangle_package
 from compiler.js.code import process, parse_deps, generate_accessors, replace_enums, path_or_parent, mangle_path
 from compiler import lang
 import json
@@ -15,6 +18,7 @@ class component_generator(object):
 		self.const_properties = {}
 		self.properties = []
 		self.enums = {}
+		self.consts = {}
 		self.assignments = {}
 		self.animations = {}
 		self.package = get_package(name)
@@ -35,7 +39,11 @@ class component_generator(object):
 	@property
 	def class_name(self):
 		idx = self.name.rindex('.')
-		return self.name[idx + 1:] if idx >= 0 else self.name
+		return escape(self.name[idx + 1:] if idx >= 0 else self.name)
+
+	@property
+	def mangled_name(self):
+		return mangle_package(get_package(self.name)) + '.' + self.class_name
 
 	@property
 	def local_name(self):
@@ -68,8 +76,8 @@ class component_generator(object):
 		t = type(value)
 		if t is lang.Component:
 			value = self.create_component_generator(value)
-		if t is str: #and value[0] == '"' and value[-1] == '"':
-			value = value.replace("\\\n", "") #multiline continuation \<NEWLINE>
+		if isinstance(value, (str, basestring)): #and value[0] == '"' and value[-1] == '"':
+			value = str(value.replace("\\\n", "")) #multiline continuation \<NEWLINE>
 		if target in self.assignments:
 			raise Exception("double assignment to '%s' in %s of type %s" %(target, self.name, self.component.name))
 		self.assignments[target] = value
@@ -83,7 +91,7 @@ class component_generator(object):
 			self.properties.append(child)
 			for name, default_value in child.properties:
 				if self.has_property(name):
-					raise Exception("duplicate property " + name)
+					raise Exception("duplicate property %s.%s" %(self.name, name))
 
 				#print self.name, name, default_value, lang.value_is_trivial(default_value)
 				if child.lazy:
@@ -142,7 +150,7 @@ class component_generator(object):
 					fullname, args, code = split_name(name), child.args, child.code
 					if fullname in self.methods:
 						raise Exception("duplicate method " + name)
-					self.methods[fullname] = args, code, child.event #fixme: fix code duplication here
+					self.methods[fullname] = args, code, child.event, child.async_ #fixme: fix code duplication here
 		elif t is lang.Signal:
 			name = child.name
 			if name in self.signals:
@@ -153,6 +161,10 @@ class component_generator(object):
 		elif t is lang.AssignmentScope:
 			for assign in child.values:
 				self.assign(child.target + '.' + assign.target, assign.value)
+		elif t is lang.Const:
+			if child.name in self.consts:
+				raise Exception("duplicate static property " + child.name)
+			self.consts[child.name] = child
 		else:
 			raise Exception("unhandled element: %s" %child)
 
@@ -177,19 +189,19 @@ class component_generator(object):
 			code += '\n' + value.generate_setup_code(registry, target, closure, ident_n)
 		return code
 
-	def get_base_type(self, registry, register_used = True):
-		return registry.find_component(self.package, self.component.name, register_used)
+	def get_base_type(self, registry, *args, **kw):
+		return registry.find_component(self.package, self.component.name, *args, **kw)
 
 	def generate(self, registry):
-		base_type = self.get_base_type(registry)
+		base_type = self.get_base_type(registry, mangle = True)
 		r = []
-		r.append("\tvar %s = _globals.%s" %(self.base_local_name, base_type))
+		r.append("\tvar %s = %s" %(self.base_local_name, base_type))
 		r.append("\tvar %s = %s.prototype" %(self.base_proto_name, self.base_local_name))
 		r.append("")
 		r.append("/**\n * @constructor")
-		r.append(" * @extends {_globals.%s}" %base_type)
+		r.append(" * @extends {%s}" %base_type)
 		r.append(" */")
-		r.append("\tvar %s = _globals.%s = function(parent, row) {" %(self.local_name, self.name))
+		r.append("\tvar %s = %s.%s = function(parent, row) {" %(self.local_name, mangle_package(self.package), self.class_name))
 		r.append("\t\t%s.apply(this, arguments)" % self.base_local_name)
 		r.append(self.ctor)
 		r.append("\t}")
@@ -198,9 +210,9 @@ class component_generator(object):
 
 	def generate_animations(self, registry, parent):
 		r = []
-		for name, animation in self.animations.iteritems():
+		for name, animation in self.animations.items():
 			var = "behavior_%s_on_%s" %(escape(parent), escape(name))
-			r.append("\tvar %s = new _globals.%s(%s)" %(var, registry.find_component(self.package, animation.component.name), parent))
+			r.append("\tvar %s = new %s(%s)" %(var, registry.find_component(self.package, animation.component.name, mangle = True), parent))
 			r.append("\tvar %s$c = { %s: %s }" %(var, var, var))
 			r.append(self.call_create(registry, 1, var, animation, var + '$c'))
 			r.append(self.call_setup(registry, 1, var, animation, var + '$c'))
@@ -225,10 +237,10 @@ class component_generator(object):
 		self.signal_handlers = {}
 		self.key_handlers = {}
 		#print 'pregenerate', self.name
-		base_type = self.get_base_type(registry, False)
+		base_type = self.get_base_type(registry, register_used = False)
 		base_gen = registry.components[base_type] if base_type != 'core.CoreObject' else None
 
-		for (path, name), (args, code, event) in methods.iteritems():
+		for (path, name), (args, code, event, async_) in methods.items():
 			oname = name
 			fullname = path, name
 
@@ -252,23 +264,23 @@ class component_generator(object):
 					fullname = path, name
 					if fullname in self.key_handlers:
 						raise Exception("duplicate key handler " + oname)
-					self.key_handlers[fullname] = (('key', 'event'), code)
+					self.key_handlers[fullname] = ('key', 'event'), code, False
 				elif is_changed:
 					name = name[:-7]
 					fullname = path, name
 					if fullname in self.changed_handlers:
 						raise Exception("duplicate signal handler " + oname)
-					self.changed_handlers[fullname] = (('value', ), code)
+					self.changed_handlers[fullname] = ('value', ), code, False
 				else:
 					if fullname in self.signal_handlers:
 						raise Exception("duplicate signal handler " + oname)
-					self.signal_handlers[fullname] = args, code
+					self.signal_handlers[fullname] = args, code, False
 			else:
 				if fullname in self.methods:
 					raise Exception("duplicate method " + oname)
 				if name == 'onCompleted':
 					fullname = path, '__complete'
-				self.methods[fullname] = args, code
+				self.methods[fullname] = args, code, async_
 
 	def generate_lazy_property(self, registry, proto, type, name, value, ident_n = 1):
 		ident = "\t" * ident_n
@@ -278,28 +290,25 @@ class component_generator(object):
 
 	def generate_const_property(self, registry, proto, name, code, ident_n = 1):
 		ident = "\t" * ident_n
-		var = 'const$' + name
 		return "%score.addConstProperty(%s, '%s', function() %s)" %(ident, proto, name, code)
 
 	def transform_handlers(self, registry, blocks):
 		result = {}
-		for (path, name), (args, code) in blocks.iteritems():
+		for (path, name), (args, code, async_) in blocks.items():
 			if name == '__complete':
 				code = code.strip()
 				if code[0] == '{' and code[-1] == '}':
-					code = '{ @super.__complete.call(this)\n' + code[1:-1].strip() + ' }'
+					code = '{ @super.__complete.call(this)\n' + code[1:-1].strip() + '\n}'
 			code = process(code, self, registry, args)
-			code = "function(%s) %s" %(",".join(args), code)
+			code = "%sfunction(%s) %s" %("async " if async_ else "",  ",".join(args), code)
 			result.setdefault(code, []).append((path, name))
-		return sorted(result.iteritems())
+		return sorted(result.items())
 
 	def generate_prototype(self, registry, ident_n = 1):
 		assert self.prototype == True
 
 		r = []
 		ident = "\t" * ident_n
-
-		base_type = self.get_base_type(registry)
 
 		r.append("%svar %s = %s.prototype = Object.create(%s)\n" %(ident, self.proto_name, self.local_name, self.base_proto_name))
 		if self.prototype_ctor:
@@ -309,7 +318,7 @@ class component_generator(object):
 		r.append("%s%s.componentName = '%s'" %(ident, self.proto_name, self.name))
 
 		for name in self.signals:
-			r.append("%s%s.%s = _globals.core.createSignal('%s')" %(ident, self.proto_name, name, name))
+			r.append("%s%s.%s = $core.createSignal('%s')" %(ident, self.proto_name, name, name))
 
 		for prop in self.properties:
 			for name, default_value in prop.properties:
@@ -321,16 +330,16 @@ class component_generator(object):
 				else:
 					args = ["%s" %self.proto_name, "'%s'" %prop.type, "'%s'" %name]
 					if lang.value_is_trivial(default_value):
-						default_value, deps = parse_deps('@error', default_value, partial(self.transform_root, registry))
+						default_value, deps = parse_deps('@error', default_value, partial(self.transform_root, registry, None))
 						if deps:
-							raise Exception('trivial value emits dependencies')
+							raise Exception('trivial value emits dependencies %s (default: %s)' %(deps, default_value))
 						args.append(default_value)
 					r.append("%score.addProperty(%s)" %(ident, ", ".join(args)))
 
-		for name, prop in self.enums.iteritems():
+		for name, prop in self.enums.items():
 			values = prop.values
 
-			for i in xrange(0, len(values)):
+			for i in range(0, len(values)):
 				r.append("/** @const @type {number} */")
 				r.append("%s%s.%s = %d" %(ident, self.proto_name, values[i], i))
 				r.append("/** @const @type {number} */")
@@ -340,6 +349,10 @@ class component_generator(object):
 			if prop.default is not None:
 				args.append("%s.%s" %(self.local_name, prop.default))
 			r.append("%score.addProperty(%s)" %(ident, ", ".join(args)))
+
+		for name, prop in self.consts.items():
+			r.append("/** @const */")
+			r.append("%s%s.%s = %s.%s = $core.core.convertTo('%s', %s)" %(ident, self.proto_name, name, self.local_name, name, prop.type, json.dumps(prop.value)))
 
 		def next_codevar(lines, code, index):
 			var = "$code$%d" %index
@@ -365,7 +378,7 @@ class component_generator(object):
 				r.append("%s%s.%s = %s" %(ident, self.proto_name, name, code))
 
 		for code, handlers in self.transform_handlers(registry, self.changed_handlers):
-			handlers = filter(put_in_prototype, handlers)
+			handlers = list(filter(put_in_prototype, handlers))
 			if not handlers:
 				continue
 
@@ -375,10 +388,10 @@ class component_generator(object):
 
 			for (path, name) in handlers:
 				assert not path
-				r.append("%s_globals.core._protoOnChanged(%s, '%s', %s)" %(ident, self.proto_name, name, code))
+				r.append("%s$core._protoOnChanged(%s, '%s', %s)" %(ident, self.proto_name, name, code))
 
 		for code, handlers in self.transform_handlers(registry, self.signal_handlers):
-			handlers = filter(put_in_prototype, handlers)
+			handlers = list(filter(put_in_prototype, handlers))
 			if not handlers:
 				continue
 
@@ -387,10 +400,10 @@ class component_generator(object):
 				code_index += 1
 
 			for path, name in handlers:
-				r.append("%s_globals.core._protoOn(%s, '%s', %s)" %(ident, self.proto_name, name, code))
+				r.append("%s$core._protoOn(%s, '%s', %s)" %(ident, self.proto_name, name, code))
 
 		for code, handlers in self.transform_handlers(registry, self.key_handlers):
-			handlers = filter(put_in_prototype, handlers)
+			handlers = list(filter(put_in_prototype, handlers))
 			if not handlers:
 				continue
 
@@ -399,7 +412,7 @@ class component_generator(object):
 				code_index += 1
 
 			for (path, name) in handlers:
-				r.append("%s_globals.core._protoOnKey(%s, '%s', %s)" %(ident, self.proto_name, name, code))
+				r.append("%s$core._protoOnKey(%s, '%s', %s)" %(ident, self.proto_name, name, code))
 
 
 		generate = False
@@ -453,7 +466,7 @@ class component_generator(object):
 
 	def generate_creator_function(self, registry, name, value, ident_n = 1):
 		ident = "\t" * ident_n
-		code = "%svar %s = new _globals.%s(__parent, __row)\n" %(ident, name, registry.find_component(value.package, value.component.name))
+		code = "%svar %s = new %s(__parent, __row)\n" %(ident, name, registry.find_component(value.package, value.component.name, mangle = True))
 		code += "%svar $c = { %s : %s }\n" %(ident, name, name)
 		code += self.call_create(registry, ident_n + 1, name, value, '$c') + '\n'
 		code += self.call_setup(registry, ident_n + 1, name, value, '$c') + '\n'
@@ -466,7 +479,7 @@ class component_generator(object):
 
 		if not self.prototype:
 			for name in self.signals:
-				r.append("%s%s.%s = _globals.core.createSignal('%s').bind(%s)" %(ident, parent, name, name, parent))
+				r.append("%s%s.%s = $core.createSignal('%s').bind(%s)" %(ident, parent, name, name, parent))
 
 			for prop in self.properties:
 				for name, default_value in prop.properties:
@@ -478,25 +491,27 @@ class component_generator(object):
 					else:
 						args = [parent, "'%s'" %prop.type, "'%s'" %name]
 						if lang.value_is_trivial(default_value):
-							default_value, deps = parse_deps('@error', default_value, partial(self.transform_root, registry))
+							default_value, deps = parse_deps('@error', default_value, partial(self.transform_root, registry, None))
 							if deps:
-								raise Exception('trivial value emits dependencies')
+								raise Exception('trivial value emits dependencies %s (default: %s)' %(deps, default_value))
 							args.append(default_value)
 						r.append("\tcore.addProperty(%s)" %(", ".join(args)))
 
-			for name, prop in self.enums.iteritems():
-				raise Exception('adding enums in runtime is unsupported, consider putting this property (%s) in prototype' %name)
+			for name, prop in self.enums.items():
+				raise Exception('adding enums without prototype is not supported, consider putting this property (%s) in prototype' %name)
+			for name, prop in self.consts.items():
+				raise Exception('adding consts without prototype is not unsupported, consider putting this property (%s) in prototype' %name)
 
 		for idx, gen in enumerate(self.children):
 			var = "%s$child%d" %(escape(parent), idx)
-			component = registry.find_component(self.package, gen.component.name)
-			r.append("%svar %s = new _globals.%s(%s)" %(ident, var, component, parent))
+			component = registry.find_component(self.package, gen.component.name, mangle = True)
+			r.append("%svar %s = new %s(%s)" %(ident, var, component, parent))
 			r.append("%s%s.%s = %s" %(ident, closure, var, var))
 			code = self.call_create(registry, ident_n, var, gen, closure)
 			r.append(code)
-			r.append("%s%s.addChild(%s)" %(ident, parent, var));
+			r.append("%s%s.addChild(%s)" %(ident, parent, var))
 
-		for target, value in self.assignments.iteritems():
+		for target, value in self.assignments.items():
 			if target == "id":
 				if "." in value:
 					raise Exception("expected identifier, not expression")
@@ -510,7 +525,7 @@ class component_generator(object):
 				if target != "delegate":
 					var = "%s$%s" %(escape(parent), escape(target))
 					r.append("//creating component %s" %value.name)
-					r.append("%svar %s = new _globals.%s(%s)" %(ident, var, registry.find_component(value.package, value.component.name), parent))
+					r.append("%svar %s = new %s(%s)" %(ident, var, registry.find_component(value.package, value.component.name, mangle = True), parent))
 					r.append("%s%s.%s = %s" %(ident, closure, var, var))
 					code = self.call_create(registry, ident_n, var, value, closure)
 					r.append(code)
@@ -519,16 +534,16 @@ class component_generator(object):
 					code = self.generate_creator_function(registry, 'delegate', value, ident_n)
 					r.append("%s%s.%s = %s" %(ident, parent, target, code))
 
-		for name, target in self.aliases.iteritems():
-			get, pname = generate_accessors(parent, target, partial(self.transform_root, registry))
+		for name, target in self.aliases.items():
+			get, pname = generate_accessors(parent, target, partial(self.transform_root, registry, None))
 			r.append("%score.addAliasProperty(%s, '%s', function() { return %s }, '%s')" \
 				%(ident, parent, name, get, pname))
 
 		return "\n".join(r)
 
-	def transform_root(self, registry, property):
+	def transform_root(self, registry, parent, property):
 		if property == 'context':
-			return '_context'
+			return ("%s._get('%s')" %(parent, property)) if parent else '_context'
 		elif property == 'parent':
 			return 'parent'
 		else:
@@ -536,11 +551,12 @@ class component_generator(object):
 			if prop:
 				return property
 			else:
-				return "_get('%s')" %property
+				#replace first id (not a property with parent object reference)
+				return ("%s._get('%s')" %(parent, property)) if parent else ("_get('%s')" %property)
 
 	def get_rvalue(self, registry, parent, target):
 		path = target.split(".")
-		return "%s.%s" % (parent, mangle_path(path, partial(self.transform_root, registry)))
+		return "%s.%s" % (parent, mangle_path(path, partial(self.transform_root, registry, None)))
 
 	def get_lvalue(self, registry, parent, target):
 		path = target.split(".")
@@ -552,16 +568,16 @@ class component_generator(object):
 		r = []
 		ident = "\t" * ident_n
 
-		for target, value in self.assignments.iteritems():
+		for target, value in self.assignments.items():
 			if target == "id":
 				continue
 			t = type(value)
 			#print self.name, target, value
 			target_owner, target_lvalue, target_prop = self.get_lvalue(registry, parent, target)
-			if t is str:
+			if isinstance(value, (str, basestring)):
 				value = replace_enums(value, self, registry)
 				r.append('//assigning %s to %s' %(target, value))
-				value, deps = parse_deps(parent, value, partial(self.transform_root, registry))
+				value, deps = parse_deps(parent, value, partial(self.transform_root, registry, None))
 				if deps:
 					undep = []
 					for idx, _dep in enumerate(deps):
@@ -591,7 +607,6 @@ class component_generator(object):
 			lines.append(code)
 			return var
 
-		base_type = self.get_base_type(registry)
 		if not self.prototype:
 			for code, methods in self.transform_handlers(registry, self.methods):
 				if len(methods) > 1:
@@ -599,12 +614,12 @@ class component_generator(object):
 					code_index += 1
 
 				for path, name in sorted(methods):
-					path = path_or_parent(path, parent, partial(self.transform_root, registry))
-					code = code.replace('@super.', '_globals.' + base_type + '.prototype.')
+					path = path_or_parent(path, parent, partial(self.transform_root, registry, None))
+					code = code.replace('@super.', self.get_base_type(registry, mangle = True) + '.prototype.')
 					r.append("%s%s.%s = %s.bind(%s)" %(ident, path, name, code, parent))
 
 		for code, handlers in self.transform_handlers(registry, self.signal_handlers):
-			handlers = filter(put_in_instance, handlers)
+			handlers = list(filter(put_in_instance, handlers))
 			if not handlers:
 				continue
 
@@ -613,11 +628,15 @@ class component_generator(object):
 				code_index += 1
 
 			for path, name in sorted(handlers):
-				path = path_or_parent(path, parent, partial(self.transform_root, registry))
-				r.append("%s%s.on('%s', %s.bind(%s))" %(ident, path, name, code, parent))
+				has_path = bool(path)
+				path = path_or_parent(path, parent, partial(self.transform_root, registry, parent))
+				if has_path:
+					r.append("%sif (%s) %s.on('%s', %s.bind(%s))" %(ident, path, path, name, code, parent)) #fixme: remove me?
+				else:
+					r.append("%s%s.on('%s', %s.bind(%s))" %(ident, path, name, code, parent))
 
 		for code, handlers in self.transform_handlers(registry, self.changed_handlers):
-			handlers = filter(put_in_instance, handlers)
+			handlers = list(filter(put_in_instance, handlers))
 			if not handlers:
 				continue
 
@@ -626,11 +645,15 @@ class component_generator(object):
 				code_index += 1
 
 			for path, name in sorted(handlers):
-				path = path_or_parent(path, parent, partial(self.transform_root, registry))
-				r.append("%s%s.onChanged('%s', %s.bind(%s))" %(ident, path, name, code, parent))
+				has_path = bool(path)
+				path = path_or_parent(path, parent, partial(self.transform_root, registry, parent))
+				if has_path:
+					r.append("%sif (%s) %s.onChanged('%s', %s.bind(%s))" %(ident, path, path, name, code, parent)) #fixme: remove me?
+				else:
+					r.append("%s%s.onChanged('%s', %s.bind(%s))" %(ident, path, name, code, parent))
 
 		for code, handlers in self.transform_handlers(registry, self.key_handlers):
-			handlers = filter(put_in_instance, handlers)
+			handlers = list(filter(put_in_instance, handlers))
 			if not handlers:
 				continue
 
@@ -639,7 +662,7 @@ class component_generator(object):
 				code_index += 1
 
 			for path, name in sorted(handlers):
-				path = path_or_parent(path, parent, partial(self.transform_root, registry))
+				path = path_or_parent(path, parent, partial(self.transform_root, registry, parent))
 				r.append("%s%s.onPressed('%s', %s.bind(%s))" %(ident, path, name, code, parent))
 
 		for idx, value in enumerate(self.children):
@@ -647,8 +670,9 @@ class component_generator(object):
 			r.append(self.call_setup(registry, ident_n, var, value, closure))
 
 		if self.elements:
-			r.append("\t%s.assign(%s)" %(parent, json.dumps(self.elements, sort_keys=True)))
+			r.append("%s%s.assign(%s)" %(ident, parent, json.dumps(self.elements, sort_keys=True)))
 
 		r.append(self.generate_animations(registry, parent))
+		r.append('%s%s.completed()' %(ident, parent))
 
 		return "\n".join(r)

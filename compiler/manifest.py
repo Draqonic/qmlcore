@@ -1,4 +1,15 @@
+from builtins import object
+
 import json
+
+def _get_property(obj, name, default = None):
+	if '.' in name:
+		path = name.split('.')
+		for k in path[:-1]:
+			obj = obj.get(k, {})
+		return obj.get(path[-1], default)
+	else:
+		return obj.get(name, default)
 
 def _set_property(obj, name, value):
 		if '.' in name:
@@ -17,8 +28,8 @@ def _pair_hook(pairs):
 	return obj
 
 def merge_properties(dst, src):
-	src = _pair_hook(src.iteritems())
-	for key, value in src.iteritems():
+	src = _pair_hook(list(src.items()))
+	for key, value in src.items():
 		if key.find('.') >= 0:
 			raise Exception('dot found in key')
 		if isinstance(value, dict):
@@ -54,6 +65,13 @@ class Manifest(object):
 	@property
 	def requires(self):
 		return self.data.get('requires', [])
+
+	@property
+	def use_only_for(self):
+		return self.data.get('use-only-for', [])
+
+	def platform_requires(self, platform):
+		return _get_property(self.data, 'platform.%s.requires' %platform, [])
 
 	@property
 	def minify(self):
